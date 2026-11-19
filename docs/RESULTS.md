@@ -103,11 +103,15 @@ Snapping moves only boundaries that fall in VAD-detected silence; text is never 
 
 The differences are 0–2 words out of 278, so **no measurable effect** at this size. The strongest models already know these terms, and a single TTS voice is easy. Vocabulary is expected to matter for course-specific names, acronyms and coined notation that no model has seen. Measure on your own lectures with `hearken eval run --vocab both`.
 
-## Speed and memory summary (default preset)
+## Speed and memory summary
 
-- ~4.3 min of processing per hour of audio, so a 3 h lecture takes about 13 min.
-- Peak 6.2 GB unified (GPU) memory, ~3–4 GB RSS. Audio is memory-mapped: 3 h of audio is 0.7 GB.
-- Disk for the default models: Qwen3 8-bit 2.5 GB, forced aligner 1.8 GB, Parakeet 2.5 GB.
+| | default `fast` | `accurate` |
+|---|---|---|
+| processing per audio hour | ~1 min (3 h lecture ≈ 3 min) | ~4.3 min (3 h ≈ 13 min) |
+| peak unified (GPU) memory | 2.4 GB | 6.2 GB |
+| model disk | 2.5 GB | 6.8 GB |
+
+Audio is memory-mapped in both: 3 h of audio is 0.7 GB.
 
 ## Known failure modes
 

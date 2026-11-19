@@ -12,8 +12,8 @@ Why these models, in one page: [docs/MODEL_CHOICE.md](docs/MODEL_CHOICE.md). Des
 ## Requirements
 
 - macOS on Apple Silicon (M1 or later), Python 3.10–3.13
-- ~7 GB free disk for the default models
-- 16 GB unified memory recommended for the default preset (peak ~6 GB); `fast` runs in ~2.5 GB
+- ~2.5 GB free disk for the default model (~7 GB more for `accurate`)
+- 8 GB unified memory is enough for the default preset (peak ~2.4 GB); `accurate` needs ~6 GB
 
 No system `ffmpeg` needed: decoding uses PyAV's bundled FFmpeg libraries.
 
@@ -27,7 +27,7 @@ python3.12 -m venv .venv
 
 Optional extras: `.[whisper]` adds the Whisper large-v3 engine (pulls in PyTorch); `.[eval]` adds benchmarking tools; `.[dev]` adds tests.
 
-Download the models for the default preset once, while online (~7 GB; `hearken setup --preset fast` for Parakeet only):
+Download the default model once, while online (~2.5 GB; `hearken setup --preset accurate` adds the Qwen3 models):
 
 ```bash
 .venv/bin/hearken setup
@@ -70,13 +70,15 @@ hearken reformat out/lecture.raw.json --mode verbatim --no-markers
 
 | preset | what | TED WER | time per audio hour | peak memory |
 |---|---|---|---|---|
-| `accurate` (default) | Qwen3-ASR 1.7B 8-bit transcript, Parakeet cross-check | 2.2% | ~4.3 min | 6.2 GB |
+| `fast` (default) | Parakeet TDT v2 only, no cross-check | 3.0% | ~1 min | 2.4 GB |
+| `accurate` | Qwen3-ASR 1.7B 8-bit transcript, Parakeet cross-check | 2.2% | ~4.3 min | 6.2 GB |
 | `accurate-full` | same, full-precision Qwen3 (no more accurate) | 2.2% | ~5.5 min | 8.2 GB |
-| `fast` | Parakeet TDT v2 only, no cross-check | 3.0% | ~1 min | 2.4 GB |
 | `qwen3-8bit`, `qwen3` | Qwen3 only, no cross-check | 2.2% | ~4 / ~6 min | 6.2 / 8.2 GB |
 | `triple`, `whisper` | add / use Whisper large-v3 (needs `.[whisper]`) | 3.5% (Whisper) | ~8 min | 4.0 GB |
 
 Measured on an M5 Pro with 24 GB. `hearken presets` lists all presets.
+
+`fast` is the default because it is ~4× faster and ~2.5× lighter. Its extra errors are mostly dropped repetitions and fillers ("I am I am" → "I am"). It has no second model, so the review list only contains VAD-based checks (words in silence, speech without words, repetition loops). Use `--preset accurate` when every word matters, or for a recording with heavy disfluency.
 
 ### Course vocabulary
 
