@@ -29,8 +29,8 @@ from .verify import VerifyConfig, verify
 log = logging.getLogger(__name__)
 
 FORMATS = ("txt", "srt", "vtt", "json", "html")
-RAW_SCHEMA = "quietwhisper.raw/1"
-DOC_SCHEMA = "quietwhisper.transcript/1"
+RAW_SCHEMA = "hearken.raw/1"
+DOC_SCHEMA = "hearken.transcript/1"
 
 Progress = Callable[[str, float, str], None]  # (stage, fraction 0..1, detail)
 
@@ -193,7 +193,7 @@ def transcribe_file(src: str | Path, out_dir: str | Path, opts: RunOptions,
     stem = stem or src.stem
     raw = {
         "schema": RAW_SCHEMA,
-        "tool": {"name": "quietwhisper", "version": __version__},
+        "tool": {"name": "hearken", "version": __version__},
         "created": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
         "source": {"name": src.name, "sha256": _sha256(src), "bytes": src.stat().st_size},
         "preset": preset.name,
@@ -221,7 +221,7 @@ def load_raw(path: str | Path) -> dict:
     import json
     doc = json.loads(Path(path).read_text(encoding="utf-8"))
     if doc.get("schema") != RAW_SCHEMA:
-        raise ConfigError(f"{path} is not a quietWhisper raw transcript")
+        raise ConfigError(f"{path} is not a hearken raw transcript")
     return doc
 
 

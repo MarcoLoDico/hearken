@@ -1,13 +1,13 @@
 import numpy as np
 import pytest
 
-from quietwhisper.chunking import plan_chunks
-from quietwhisper.engines.base import words_from_tokens
-from quietwhisper.engines.qwen3 import attach_timings
-from quietwhisper.textnorm import diff_words, normalize
-from quietwhisper.types import EngineResult, Word
-from quietwhisper.vad import FRAME_S, SpeechProbs, energy_probs
-from quietwhisper.verify import find_repetitions, verify
+from hearken.chunking import plan_chunks
+from hearken.engines.base import words_from_tokens
+from hearken.engines.qwen3 import attach_timings
+from hearken.textnorm import diff_words, normalize
+from hearken.types import EngineResult, Word
+from hearken.vad import FRAME_S, SpeechProbs, energy_probs
+from hearken.verify import find_repetitions, verify
 
 
 def probs_from_regions(duration, regions):
@@ -119,7 +119,7 @@ def test_energy_vad_detects_bursts(burst):
 
 
 def test_snap_onsets_moves_only_starts_in_silence():
-    from quietwhisper.timing import snap_onsets
+    from hearken.timing import snap_onsets
     speech = probs_from_regions(10.0, [(1.0, 2.0), (3.0, 4.0)])
     early = Word("late", 0.6, 1.5)        # starts 0.4 s before speech
     ok = Word("fine", 3.1, 3.6)           # already inside speech
@@ -127,4 +127,6 @@ def test_snap_onsets_moves_only_starts_in_silence():
     n = snap_onsets([early, ok, ghost], speech)
     assert n == 1
     assert abs(early.start - 1.0) <= FRAME_S and early.end == 1.5 and early.text == "late"
+    tail = Word("tail", 3.5, 4.8)          # ends 0.8 s into the pause
+    assert snap_onsets([tail], speech) == 1 and abs(tail.end - 4.0) <= FRAME_S and tail.start == 3.5
     assert (ok.start, ghost.start) == (3.1, 6.0)

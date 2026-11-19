@@ -1,7 +1,7 @@
 """Model registry with pinned revisions, and offline-only resolution.
 
 Revisions are pinned to exact Hugging Face commit hashes so a given version of
-quietWhisper always runs byte-identical weights. `qw setup` is the only code
+hearken always runs byte-identical weights. `hearken setup` is the only code
 path that touches the network; transcription resolves models with
 ``local_files_only=True`` and sets HF_HUB_OFFLINE=1.
 """
@@ -46,8 +46,6 @@ MODELS: dict[str, ModelSpec] = {
                   "c7cbfc2048c462b0d63a45797104fc9db3ad62b7", "Apache-2.0", "11 languages", "Word timestamps for Qwen3-ASR."),
         ModelSpec("whisper-large-v3", "whisper", "mlx-community/whisper-large-v3-mlx",
                   "49e6aa286ad60c14352c404340ded53710378a11", "MIT", "99 languages"),
-        ModelSpec("whisper-large-v3-turbo", "whisper", "mlx-community/whisper-large-v3-turbo",
-                  None, "MIT", "99 languages"),
     ]
 }
 
@@ -56,7 +54,7 @@ PINNED_VAD_SHA256 = "2623a2953f6ff3d2c1e61740c6cdb7168133479b267dfef114a4a3cc5bd
 
 
 def home() -> Path:
-    p = Path(os.environ.get("QW_HOME", Path.home() / ".cache" / "quietwhisper"))
+    p = Path(os.environ.get("HEARKEN_HOME", Path.home() / ".cache" / "hearken"))
     p.mkdir(parents=True, exist_ok=True)
     return p
 
@@ -83,7 +81,7 @@ def resolve_local(key: str) -> Path:
     except (LocalEntryNotFoundError, FileNotFoundError, OSError) as e:
         raise ModelNotAvailableError(
             f"model {key} ({s.repo}@{s.revision or 'latest'}) is not downloaded; "
-            f"run `qw setup --models {key}` once while online"
+            f"run `hearken setup --models {key}` once while online"
         ) from e
 
 

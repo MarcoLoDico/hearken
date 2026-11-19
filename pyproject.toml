@@ -3,7 +3,7 @@ requires = ["setuptools>=69"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "quietwhisper"
+name = "hearken"
 version = "0.1.0"
 description = "Accuracy-first, fully local transcription for long lectures on Apple Silicon"
 readme = "README.md"
@@ -28,10 +28,10 @@ eval = ["jiwer>=3.0", "soundfile>=0.12", "pyarrow>=15"]
 dev = ["pytest>=8", "jiwer>=3.0", "soundfile>=0.12", "pyarrow>=15"]
 
 [project.scripts]
-qw = "quietwhisper.cli:main"
+hearken = "hearken.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["quietwhisper*"]
+include = ["hearken*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -110,5 +110,5 @@ def detect(samples: np.ndarray, model_path: Path | None) -> SpeechProbs:
         except Exception as e:  # onnxruntime failures should not abort a 3 h job
             log.warning("Silero VAD failed (%s); falling back to energy VAD", e)
     else:
-        log.warning("Silero VAD model not found; using energy VAD (run `qw setup`)")
+        log.warning("Silero VAD model not found; using energy VAD (run `hearken setup`)")
     return energy_probs(samples)

@@ -94,7 +94,7 @@ class DecodedAudio:
 
 def decode(path: str | Path, workdir: str | Path | None = None) -> DecodedAudio:
     """Decode any audio/video file to 16 kHz mono float32."""
-    import av  # imported lazily: heavy, and not needed for e.g. `qw review`
+    import av  # imported lazily: heavy, and not needed for e.g. `hearken review`
 
     path = Path(path)
     if not path.is_file():
@@ -121,7 +121,7 @@ def decode(path: str | Path, workdir: str | Path | None = None) -> DecodedAudio:
         # to centred speech and can push loud recordings past full scale.
         resampler = av.AudioResampler(format="fltp", rate=SAMPLE_RATE)
 
-        fd, tmp = tempfile.mkstemp(prefix="qw-audio-", suffix=".f32", dir=workdir)
+        fd, tmp = tempfile.mkstemp(prefix="hearken-audio-", suffix=".f32", dir=workdir)
         os.chmod(tmp, 0o600)
         n = 0
         try:

@@ -14,7 +14,7 @@ class AudioError(QuietWhisperError):
 
 
 class ModelNotAvailableError(QuietWhisperError):
-    """A required model is not present in the local cache (run `qw setup`)."""
+    """A required model is not present in the local cache (run `hearken setup`)."""
 
     exit_code = 3
 

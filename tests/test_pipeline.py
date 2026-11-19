@@ -8,9 +8,9 @@ import stat
 import numpy as np
 import pytest
 
-from quietwhisper import audio, engines, models, pipeline, presets
-from quietwhisper.errors import AudioError
-from quietwhisper.presets import EngineSpec, Preset
+from hearken import audio, engines, models, pipeline, presets
+from hearken.errors import AudioError
+from hearken.presets import EngineSpec, Preset
 
 from .conftest import SR, BurstEngine, burst_signal
 
@@ -38,7 +38,7 @@ def _write(path, x, sr=SR, channels=1, codec=None):
 
 @pytest.fixture
 def fake_env(monkeypatch, tmp_path):
-    monkeypatch.setenv("QW_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("HEARKEN_HOME", str(tmp_path / "home"))
     monkeypatch.setitem(presets.PRESETS, "fake", Preset("fake", "test", (EngineSpec("burst", {}),)))
     monkeypatch.setitem(presets.PRESETS, "fake2", Preset("fake2", "test", (EngineSpec("burst", {}),
                                                                           EngineSpec("burst", {"max_chunk_s": 13.0}))))
@@ -91,7 +91,7 @@ def test_all_formats_and_raw_immutability(fake_env, tmp_path):
     again = pipeline.render_from_raw(pipeline.load_raw(r1.raw_path), r1.raw_path, tmp_path / "re", "talk",
                                      pipeline.RunOptions(formats=("json",)), "talk.m4a")
     assert json.loads(again["json"].read_text())["words"] == doc["words"]
-    assert not any(p.name.startswith("qw-audio-") for p in out.iterdir())  # temp audio cleaned
+    assert not any(p.name.startswith("hearken-audio-") for p in out.iterdir())  # temp audio cleaned
 
 
 @pytest.mark.parametrize("suffix,sr,ch", [("wav", 44100, 2), ("mp3", 44100, 2), ("m4a", 48000, 1), ("mp4", 22050, 1)])
@@ -129,6 +129,6 @@ def test_quiet_audio_gets_linear_gain_only():
 def test_missing_model_is_reported(monkeypatch, tmp_path):
     monkeypatch.setenv("HF_HUB_CACHE", str(tmp_path / "empty"))
     monkeypatch.setitem(models.MODELS, "nope", models.ModelSpec("nope", "x", "nobody/nothing", None, "-", "-"))
-    from quietwhisper.errors import ModelNotAvailableError
+    from hearken.errors import ModelNotAvailableError
     with pytest.raises(ModelNotAvailableError):
         models.resolve_local("nope")

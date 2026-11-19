@@ -53,7 +53,7 @@ def nemo_logmel(x, args):
 class ParakeetEngine(Engine):
     name = "parakeet"
 
-    def __init__(self, model_key: str = "parakeet-tdt-0.6b-v2", *, beam_size: int = 4,
+    def __init__(self, model_key: str = "parakeet-tdt-0.6b-v2", *, beam_size: int = 1,
                  boost_weight: float = 2.0, max_chunk_s: float = 120.0, pad_s: float = 5.0,
                  frontend: str = "nemo"):
         self.model_key = model_key
@@ -84,13 +84,14 @@ class ParakeetEngine(Engine):
         key = tuple(sorted(vocab))
         if self._decoding is not None and key == self._booster_vocab:
             return self._decoding
-        if self.beam_size <= 1:
-            dec = Greedy()
-        elif vocab:
-            # The trie booster matches at word boundaries itself.
+        if vocab:
+            # The trie booster only acts during beam search, so a vocabulary
+            # implies beam decoding (beam 4 if greedy was configured).
             weights = {term: self.boost_weight for term in vocab if term.strip()}
             booster = lift(words(weights), self._model.vocabulary)
-            dec = Beam(beam_size=self.beam_size, booster=booster)
+            dec = Beam(beam_size=max(self.beam_size, 4), booster=booster)
+        elif self.beam_size <= 1:
+            dec = Greedy()
         else:
             dec = Beam(beam_size=self.beam_size)
         self._decoding = DecodingConfig(decoding=dec)

@@ -180,7 +180,7 @@ def cmd_run(a: argparse.Namespace) -> int:
                 run_dir = out / preset / (it["id"] + ("+vocab" if use_vocab else ""))
                 mfile = run_dir / "metrics.json"
                 run_dir.mkdir(parents=True, exist_ok=True)
-                cmd = [sys.executable, "-m", "quietwhisper.cli", "transcribe", it["audio"], "-o", str(run_dir),
+                cmd = [sys.executable, "-m", "hearken.cli", "transcribe", it["audio"], "-o", str(run_dir),
                        "-p", preset, "--formats", "json,txt", "--metrics-json", str(mfile)]
                 if use_vocab:
                     cmd += ["--vocab", it["vocab"]]
@@ -266,6 +266,76 @@ def cmd_rescore(a: argparse.Namespace) -> int:
     return 0
 
 
+def word_errors(reference: str, words: list[str], language: str = "en") -> tuple[list[bool], int]:
+    """Label each hypothesis word wrong/right against the reference; also count reference
+    words deleted. A deletion marks the hypothesis word on each side of it as adjacent-wrong."""
+    from rapidfuzz.distance import Levenshtein
+    from .textnorm import _flatten
+
+    ref = normalize(reference, language).split()
+    toks, owner = _flatten(words, language)
+    wrong = [False] * len(words)
+    deleted = 0
+    for op in Levenshtein.opcodes(ref, toks):
+        if op.tag in ("replace", "insert"):
+            for k in range(op.dest_start, op.dest_end):
+                wrong[owner[k]] = True
+        elif op.tag == "delete":
+            deleted += op.src_end - op.src_start
+            for k in (op.dest_start - 1, op.dest_start):
+                if 0 <= k < len(toks):
+                    wrong[owner[k]] = True
+    return wrong, deleted
+
+
+def cmd_flags(a: argparse.Namespace) -> int:
+    """How well do review flags locate real errors? Combines a primary and a verifier run offline."""
+    from .pipeline import _decode_probs, load_raw
+    from .timing import snap_onsets
+    from .types import EngineResult, Word
+    from .vad import SpeechProbs
+    from .verify import verify
+
+    items = {i["id"]: i for i in _load_manifest(Path(a.manifest))}
+    tot = {"words": 0, "wrong": 0, "flagged": 0, "flagged_wrong": 0}
+    by_reason: dict[str, list[int]] = {}
+    for iid, it in items.items():
+        rp = sorted((Path(a.out) / a.primary / iid).glob("*.raw*.json"))
+        rv = sorted((Path(a.out) / a.verifier / iid).glob("*.raw*.json")) if a.verifier else []
+        if not rp or (a.verifier and not rv):
+            continue
+        raw = load_raw(rp[-1])
+        speech = SpeechProbs(_decode_probs(raw["vad"]["probs_u8_b64"]), raw["vad"]["method"])
+        def res(r):
+            e = r["engines"][0]
+            ws = [Word.from_dict(w) for w in e["words"]]
+            snap_onsets(ws, speech)
+            return EngineResult(e["engine"], e["model"], ws, e["chunks"], e["seconds"])
+        prim = res(raw)
+        secs = [res(load_raw(rv[-1]))] if rv else []
+        verify(prim, secs, speech)
+        wrong, _ = word_errors(Path(it["reference"]).read_text(encoding="utf-8"), [w.text for w in prim.words])
+        for w, bad in zip(prim.words, wrong):
+            tot["words"] += 1
+            tot["wrong"] += bad
+            if any(f != "interpolated_time" for f in w.flags):
+                tot["flagged"] += 1
+                tot["flagged_wrong"] += bad
+            for f in set(w.flags):
+                by_reason.setdefault(f, [0, 0])
+                by_reason[f][0] += 1
+                by_reason[f][1] += bad
+    out = {**tot,
+           "base_error_rate": round(tot["wrong"] / max(tot["words"], 1), 4),
+           "flag_rate": round(tot["flagged"] / max(tot["words"], 1), 4),
+           "precision": round(tot["flagged_wrong"] / max(tot["flagged"], 1), 4),
+           "recall": round(tot["flagged_wrong"] / max(tot["wrong"], 1), 4),
+           "by_reason": {k: {"words": v[0], "wrong": v[1], "precision": round(v[1] / max(v[0], 1), 3)}
+                         for k, v in sorted(by_reason.items())}}
+    print(json.dumps(out, indent=1))
+    return 0
+
+
 def cmd_score(a: argparse.Namespace) -> int:
     doc = json.loads(Path(a.transcript).read_text(encoding="utf-8"))
     ref = Path(a.reference).read_text(encoding="utf-8")
@@ -301,6 +371,12 @@ def add_eval_parsers(sub) -> None:
     rs.add_argument("manifest")
     rs.add_argument("--out", default="bench_results")
     rs.set_defaults(fn=cmd_rescore)
+    fl = es.add_parser("flags", help="precision/recall of review flags against references (offline)")
+    fl.add_argument("manifest")
+    fl.add_argument("--out", default="bench_results")
+    fl.add_argument("--primary", required=True, help="preset dir of the primary run")
+    fl.add_argument("--verifier", help="preset dir of the verifier run")
+    fl.set_defaults(fn=cmd_flags)
     rp = es.add_parser("report", help="regenerate report.md from results.jsonl")
     rp.add_argument("--out", default="bench_results")
     rp.set_defaults(fn=cmd_report)

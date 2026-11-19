@@ -1,4 +1,4 @@
-"""Command-line interface: `qw <command>`."""
+"""Command-line interface: `hearken <command>`."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from pathlib import Path
 from . import __version__, models, presets
 from .errors import QuietWhisperError
 
-log = logging.getLogger("quietwhisper")
+log = logging.getLogger("hearken")
 
 
 class ProgressLine:
@@ -163,14 +163,14 @@ def _add_format_args(p: argparse.ArgumentParser) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    ap = argparse.ArgumentParser(prog="qw", description="Accuracy-first local transcription for long lectures.")
-    ap.add_argument("--version", action="version", version=f"quietwhisper {__version__}")
+    ap = argparse.ArgumentParser(prog="hearken", description="Accuracy-first local transcription for long lectures.")
+    ap.add_argument("--version", action="version", version=f"hearken {__version__}")
     ap.add_argument("-v", "--verbose", action="store_true", help="debug logging (never logs transcript text)")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     p = sub.add_parser("setup", help="download models once (the only command that uses the network)")
     p.add_argument("--preset", default=presets.DEFAULT_PRESET)
-    p.add_argument("--models", nargs="*", help="explicit model keys (see `qw models`)")
+    p.add_argument("--models", nargs="*", help="explicit model keys (see `hearken models`)")
     p.add_argument("--all", action="store_true", help="download every registered model")
     p.set_defaults(fn=cmd_setup)
 

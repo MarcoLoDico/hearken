@@ -59,7 +59,7 @@ Candidates were limited to models that are open-weights, run natively on Apple S
 | Nemotron 3.5 Transcribe (30B-A4B) | 30 B MoE | OpenMDW | speech-LLM | leaderboard leader (late 2026) | ~35 GB even at 8-bit: does not fit a 24 GB Mac |
 | Cohere Transcribe, Granite Speech 4.x, Canary | 1–8 B | various | — | competitive WER | no maintained MLX port at time of writing, or NeMo/CUDA-centric |
 
-**Decision.** Parakeet TDT v2 and Qwen3-ASR are architecturally different (transducer vs. LLM decoder, different training data). Their errors are therefore largely independent, which is exactly what makes one useful as a *verifier* of the other. Whisper is kept as an optional third opinion and as a baseline. Which model is primary, and whether the verifier is on by default, is decided by the benchmark (docs/RESULTS.md), not by leaderboard claims.
+**Decision (from the benchmark, not leaderboard claims).** Qwen3-ASR 1.7B with 8-bit weights is the primary: 2.21% WER on TED-LIUM long-form vs 3.04% for Parakeet and 3.50% for Whisper, zero words in inserted silence, and the best timestamps. 8-bit weights are as accurate as bf16 and 32% faster. Parakeet TDT v2 (greedy) is the verifier. It is architecturally different (transducer vs. LLM decoder, different training data), so its errors are largely independent of Qwen3's, and it costs ~10–15% extra time. Its disagreements cover 1.8% of words and contain 17% of the primary's errors. Whisper is optional. The short version is in [MODEL_CHOICE.md](MODEL_CHOICE.md); full numbers are in [RESULTS.md](RESULTS.md).
 
 ### Why the verifier does not vote
 
@@ -67,13 +67,13 @@ ROVER-style voting between two systems cannot break ties, and with three it can 
 
 ### Parakeet front-end fix
 
-parakeet-mlx ≤ 0.7.0 computes the STFT magnitude as |re| + |im| instead of √(re² + im²) as NeMo does. hearken ships a NeMo-faithful log-mel (`frontend="nemo"`) and benchmarks it against the library's (`parakeet-libfe` preset).
+parakeet-mlx ≤ 0.7.0 computes the STFT magnitude as |re| + |im| instead of √(re² + im²) as NeMo does. hearken ships a NeMo-faithful log-mel (`frontend="nemo"`, default) and benchmarked it against the library's (`parakeet-libfe` preset). The difference is not measurable (3.04% vs 3.06% WER).
 
 ### Vocabulary
 
 A plain text file with one term per line. Each engine gets it in its own way:
 
-- Parakeet: trie booster during beam search (+2.0 log-score per completed term),
+- Parakeet: trie booster during beam search (+2.0 log-score per completed term; a vocabulary switches Parakeet from greedy to beam 4, because the booster only acts in beam search),
 - Qwen3-ASR: "Technical terms that may occur: …" as system context,
 - Whisper: "Glossary: …" initial prompt.
 

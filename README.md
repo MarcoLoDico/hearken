@@ -7,27 +7,27 @@ Accuracy-first, fully local transcription for long lectures on Apple Silicon.
 - **Complete.** No VAD gating: every second is transcribed. Chunks are cut in pauses, with padded context and exact de-duplication.
 - **Measured.** A reproducible benchmark (`hearken eval`) reports WER/CER, hallucination in silence, missing and duplicated speech, timestamp error, term recall, speed and peak memory. See [docs/RESULTS.md](docs/RESULTS.md).
 
-Design and model selection: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Why these models, in one page: [docs/MODEL_CHOICE.md](docs/MODEL_CHOICE.md). Design: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Measured accuracy, limitations and failure modes: [docs/RESULTS.md](docs/RESULTS.md).
 
 ## Requirements
 
 - macOS on Apple Silicon (M1 or later), Python 3.10–3.13
-- ~8 GB free disk for models
-- 16 GB unified memory recommended for the default preset
+- ~7 GB free disk for the default models
+- 16 GB unified memory recommended for the default preset (peak ~6 GB); `fast` runs in ~2.5 GB
 
 No system `ffmpeg` needed: decoding uses PyAV's bundled FFmpeg libraries.
 
 ## Install
 
 ```bash
-git clone <this repo> hearken && cd hearken
+git clone https://github.com/MarcoLoDico/hearken.git && cd hearken
 python3.12 -m venv .venv
 .venv/bin/pip install -e .
 ```
 
 Optional extras: `.[whisper]` adds the Whisper large-v3 engine (pulls in PyTorch); `.[eval]` adds benchmarking tools; `.[dev]` adds tests.
 
-Download the models for the default preset once, while online:
+Download the models for the default preset once, while online (~7 GB; `hearken setup --preset fast` for Parakeet only):
 
 ```bash
 .venv/bin/hearken setup
@@ -68,7 +68,15 @@ hearken reformat out/lecture.raw.json --mode verbatim --no-markers
 
 ### Presets
 
-`hearken presets` lists them. The defaults are chosen from the benchmark; see RESULTS.md.
+| preset | what | TED WER | time per audio hour | peak memory |
+|---|---|---|---|---|
+| `accurate` (default) | Qwen3-ASR 1.7B 8-bit transcript, Parakeet cross-check | 2.2% | ~4.3 min | 6.2 GB |
+| `accurate-full` | same, full-precision Qwen3 (no more accurate) | 2.2% | ~5.5 min | 8.2 GB |
+| `fast` | Parakeet TDT v2 only, no cross-check | 3.0% | ~1 min | 2.4 GB |
+| `qwen3-8bit`, `qwen3` | Qwen3 only, no cross-check | 2.2% | ~4 / ~6 min | 6.2 / 8.2 GB |
+| `triple`, `whisper` | add / use Whisper large-v3 (needs `.[whisper]`) | 3.5% (Whisper) | ~8 min | 4.0 GB |
+
+Measured on an M5 Pro with 24 GB. `hearken presets` lists all presets.
 
 ### Course vocabulary
 
@@ -94,7 +102,7 @@ Use it to measure whether vocabulary helps on *your* lectures: transcribe a 10-m
 pip install -e ".[eval]"
 hearken eval prepare-tedlium path/to/tedlium-long-form/test.parquet --out data/eval/tedlium
 hearken eval terms --out data/eval/terms
-hearken eval run data/eval/tedlium/manifest.jsonl --preset max --preset fast --out bench_results/ted
+hearken eval run data/eval/tedlium/manifest.jsonl --preset accurate --preset fast --out bench_results/ted
 ```
 
 Your own recordings: write a manifest line `{"id": "...", "audio": "x.m4a", "reference": "x.txt"}` per file.

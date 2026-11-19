@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 
-from quietwhisper.engines.base import ChunkContext, Engine
-from quietwhisper.types import Word
+from hearken.engines.base import ChunkContext, Engine
+from hearken.types import Word
 
 SR = 16000
 

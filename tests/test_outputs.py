@@ -1,8 +1,8 @@
 import re
 
-from quietwhisper.bench import hallucination, onset_errors, score, term_recall
-from quietwhisper.output import FormatOptions, to_srt, to_txt, to_vtt, ts
-from quietwhisper.types import Word
+from hearken.bench import hallucination, onset_errors, score, term_recall
+from hearken.output import FormatOptions, to_srt, to_txt, to_vtt, ts
+from hearken.types import Word
 
 
 def _ws():
