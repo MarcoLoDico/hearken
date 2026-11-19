@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.egg-info/
+data/
+bench_results/
+*.transcript/
+.pytest_cache/
+bench.log
+.DS_Store
+.claude/

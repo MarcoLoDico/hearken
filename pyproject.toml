@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "quietwhisper"
+version = "0.1.0"
+description = "Accuracy-first, fully local transcription for long lectures on Apple Silicon"
+readme = "README.md"
+requires-python = ">=3.10,<3.14"
+license = "MIT"
+dependencies = [
+  "mlx>=0.30",
+  "parakeet-mlx==0.7.0",
+  "mlx-qwen3-asr==0.4.4",
+  "av>=14",
+  "numpy>=1.26",
+  "onnxruntime>=1.18",
+  "rapidfuzz>=3",
+  "huggingface-hub>=0.24",
+  "whisper-normalizer==1.0.1",
+]
+
+[project.optional-dependencies]
+# Whisper is optional: it pulls in PyTorch (~1 GB) and is only a baseline / third opinion.
+whisper = ["mlx-whisper==0.4.3"]
+eval = ["jiwer>=3.0", "soundfile>=0.12", "pyarrow>=15"]
+dev = ["pytest>=8", "jiwer>=3.0", "soundfile>=0.12", "pyarrow>=15"]
+
+[project.scripts]
+qw = "quietwhisper.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["quietwhisper*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["models: tests that need downloaded models (slow)"]
