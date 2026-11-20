@@ -137,3 +137,14 @@ def test_missing_model_is_reported(monkeypatch, tmp_path):
     from hearken.errors import ModelNotAvailableError
     with pytest.raises(ModelNotAvailableError):
         models.resolve_local("nope")
+
+
+def test_review_page_links_media_from_default_output_dir(fake_env, tmp_path):
+    x, _ = burst_signal(5)
+    src = tmp_path / "My Lecture.wav"
+    _write(src, x)
+    out = tmp_path / "My Lecture.transcript"
+    r = pipeline.transcribe_file(src, out, pipeline.RunOptions(preset="fake", formats=("html",)))
+    html = r.outputs["html"].read_text()
+    assert 'src="../My%20Lecture.wav"' in html
+    assert (out / "../My Lecture.wav").resolve() == src.resolve()

@@ -269,10 +269,17 @@ def transcribe_file(src: str | Path, out_dir: str | Path, opts: RunOptions,
     timings["total_s"] = time.perf_counter() - t_all
     metrics = {"timings": {k: round(v, 2) for k, v in timings.items()},
                "realtime_factor": round(timings["total_s"] / max(duration, 1e-9), 4), **_peak_metrics()}
-    outputs = render_from_raw(raw, raw_path, out_dir, stem, opts, src.name, metrics)
+    outputs = render_from_raw(raw, raw_path, out_dir, stem, opts, media_ref(src, out_dir), metrics)
     n_words = len(results[0].words)
     log.info("done: %d words, %.1fs audio, %.1fs wall", n_words, duration, timings["total_s"])
     return RunResult(outputs, raw_path, n_words, outputs.pop("_n_uncertain"), duration, metrics)  # type: ignore[arg-type]
+
+
+def media_ref(media: Path, out_dir: Path) -> str:
+    """URL-encoded path to the source media, relative to the output directory."""
+    from urllib.parse import quote
+
+    return quote(os.path.relpath(media.resolve(), out_dir.resolve()))
 
 
 def load_raw(path: str | Path) -> dict:
@@ -285,6 +292,7 @@ def load_raw(path: str | Path) -> dict:
 
 def render_from_raw(raw: dict, raw_path: Path, out_dir: Path, stem: str, opts: RunOptions,
                     media_name: str, metrics: dict | None = None) -> dict:
+    """``media_name`` is how the review page refers to the source media (a relative URL)."""
     """Derive every output from the raw record. Deterministic; never edits ``raw``."""
     raw = copy.deepcopy(raw)
     out_dir.mkdir(parents=True, exist_ok=True)

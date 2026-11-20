@@ -190,7 +190,7 @@ span[data-t]{{cursor:pointer}} .u{{background:var(--u);border-radius:3px}}
 li{{margin-bottom:10px;cursor:pointer}} .r{{color:var(--mut);font-size:.8em}} .alt{{font-size:.9em;color:var(--mut)}}
 @media (max-width:800px){{main{{flex-direction:column}} aside{{position:static;max-height:none}}}}
 </style></head><body>
-<header><b>{esc(title)}</b> — {len(spans)} passages to review. Click text to play. Keep the media file next to this page.
+<header><b>{esc(title)}</b> — {len(spans)} passages to review. Click text to play.
 <video id="m" controls preload="metadata" src="{esc(media_name)}"></video></header>
 <main><div id="tx">{''.join(paras)}</div><aside><h3>Uncertain passages</h3><ol>{''.join(items)}</ol></aside></main>
 <script>

@@ -1,118 +1,72 @@
 # hearken
 
-Accuracy-first, fully local transcription for long lectures on Apple Silicon.
+**Fast, faithful, fully private lecture transcription for Apple Silicon.**
 
-- **Local and private.** The network is used once, by `hearken setup`, to download pinned open-source models. Transcription is offline. Logs never contain transcript text.
-- **Faithful.** The transcript is exactly what the primary model heard. Nothing is summarised or rewritten. Passages where models disagree, confidence is low, words appear in silence, or speech produced no words are marked for review instead of being "fixed".
-- **Complete.** No VAD gating: every second is transcribed. Chunks are cut in pauses, with padded context and exact de-duplication.
-- **Measured.** A reproducible benchmark (`hearken eval`) reports WER/CER, hallucination in silence, missing and duplicated speech, timestamp error, term recall, speed and peak memory. See [docs/RESULTS.md](docs/RESULTS.md).
+A 3-hour lecture becomes a timestamped transcript and subtitles in under a minute, on your Mac, with no cloud and no account.
 
-Why these models, in one page: [docs/MODEL_CHOICE.md](docs/MODEL_CHOICE.md). Design: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Measured accuracy, limitations and failure modes: [docs/RESULTS.md](docs/RESULTS.md).
+```bash
+hearken transcribe lecture.mp4
+```
 
-## Requirements
+## Why hearken
 
-- macOS on Apple Silicon (M1 or later), Python 3.10–3.13
-- ~2.5 GB free disk for the default model (~7 GB more for `accurate`)
-- 8 GB unified memory is enough for the default preset (peak ~3.2 GB); `accurate` peaks at ~6.7 GB, so 16 GB is recommended for it
-
-No system `ffmpeg` needed: decoding uses PyAV's bundled FFmpeg libraries.
+- **Fast.** ~16 s per hour of audio. A custom batched decoder and constant-size chunks make it ~3.4× faster than stock parakeet-mlx.
+- **Accurate.** 3.1% word error rate on TED lectures by default, 2.2% with `--preset accurate`.
+- **Private.** Models are downloaded once. After that, nothing leaves your machine, and logs never contain transcript text.
+- **Faithful.** It never summarises or "fixes" what was said. Doubtful passages are marked `[? … ?]` and listed for review.
+- **Complete.** Every second is transcribed. Chunks are cut in pauses, and tests check that no word is lost or duplicated at a cut.
+- **Light.** About 3 GB of RAM, any audio or video format, no system ffmpeg.
+- **Measured.** Every claim above comes from a reproducible benchmark; see [docs/RESULTS.md](docs/RESULTS.md).
 
 ## Install
 
+Requires macOS on Apple Silicon and Python 3.10–3.13.
+
 ```bash
 git clone https://github.com/MarcoLoDico/hearken.git && cd hearken
-python3.12 -m venv .venv
-.venv/bin/pip install -e .
+python3.12 -m venv .venv && source .venv/bin/activate
+pip install -e .
+hearken setup          # one-time model download (~2.5 GB); offline from here on
 ```
-
-Optional extras: `.[whisper]` adds the Whisper large-v3 engine (pulls in PyTorch); `.[eval]` adds benchmarking tools; `.[dev]` adds tests.
-
-Download the default model once, while online (~2.5 GB; `hearken setup --preset accurate` adds the Qwen3 models):
-
-```bash
-.venv/bin/hearken setup
-```
-
-From then on, everything works with the network off.
 
 ## Use
 
 ```bash
-hearken transcribe lecture.mp4
-hearken transcribe lecture.m4a --vocab course_terms.txt -o out/
-hearken transcribe *.mp3 --preset fast
+hearken transcribe lecture.mp4                         # any format: mp4, mov, m4a, mp3, wav, …
+hearken transcribe *.m4a -o notes/                     # batch, custom output folder
+hearken transcribe lecture.mp4 --preset accurate       # max fidelity, cross-checked by a 2nd model
+hearken transcribe lecture.mp4 --vocab terms.txt       # course terms, one per line
+hearken review notes/lecture.json                      # list passages worth checking
+hearken reformat notes/lecture.raw.json --mode verbatim   # re-render without re-transcribing
 ```
 
-Outputs, written to `<input>.transcript/` by default:
+Each run writes `<name>.transcript/` next to the input:
 
-| file | contents |
+| file | what it is |
 |---|---|
-| `lecture.txt` | readable paragraphs with timestamps; uncertain words wrapped in `[? … ?]` |
-| `lecture.srt`, `lecture.vtt` | subtitles (≤ 2 lines × 42 chars, ≤ 6 s per cue) |
-| `lecture.json` | words with timestamps and confidences, sentences, uncertain passages, engines and exact model revisions, audio analysis, timing and memory metrics |
-| `lecture.review.html` | offline review page: click any word to play from there; side panel lists every uncertain passage with each engine's reading. Keep the media file next to it. |
-| `lecture.raw.json` | **read-only** record of exactly what each model produced, before any post-processing |
+| `.txt` | readable paragraphs with timestamps |
+| `.srt` / `.vtt` | subtitles |
+| `.review.html` | click any word to play from there; uncertain passages in a side panel |
+| `.json` | every word with time and confidence, plus review items and metadata |
+| `.raw.json` | read-only record of exactly what the model heard |
 
-Review uncertain passages in the terminal:
+## Presets
 
-```bash
-hearken review out/lecture.json
-hearken review out/lecture.json --reason disagreement
-```
-
-Re-render with different formatting without re-transcribing:
-
-```bash
-hearken reformat out/lecture.raw.json --mode verbatim --no-markers
-```
-
-### Presets
-
-| preset | what | TED WER | time per audio hour | peak RAM |
+| preset | WER (TED) | per audio hour | RAM | use it when |
 |---|---|---|---|---|
-| `fast` (default) | Parakeet TDT v2 only, no cross-check | 3.1% | ~16 s | 3.2 GB |
-| `accurate` | Qwen3-ASR 1.7B 8-bit transcript, Parakeet cross-check | 2.2% | ~3.2 min | 6.7 GB |
-| `accurate-full` | same, full-precision Qwen3 (no more accurate) | 2.2% | ~4.7 min | 8.3 GB |
-| `qwen3-8bit`, `qwen3` | Qwen3 only, no cross-check | 2.2% | ~3 / ~4.5 min | 6.7 / 8.3 GB |
-| `triple`, `whisper` | add / use Whisper large-v3 (needs `.[whisper]`) | 3.5% (Whisper) | ~8 min | not re-measured* |
+| `fast` (default) | 3.1% | ~16 s | 3.2 GB | everyday lecture notes |
+| `accurate` | 2.2% | ~3 min | 6.7 GB | every word matters: verbatim quotes, disfluent speakers |
 
-Measured on an M5 Pro with 24 GB. "Peak RAM" is the process's peak memory footprint as macOS reports it (Activity Monitor's "Memory"), including MLX's GPU buffers and cache. \*Whisper's live MLX allocations peaked at 4.0 GB; its full footprint was not re-measured. `hearken presets` lists all presets.
+`fast` runs NVIDIA Parakeet TDT v2. `accurate` runs Qwen3-ASR 1.7B and has Parakeet check its work: every disagreement is flagged, and reviewing those flags finds errors ~9× faster than proofreading at random. Run `hearken setup --preset accurate` once before using it. `hearken presets` lists the rest.
 
-`fast` is the default because it is ~12× faster and needs about half the memory: a 3-hour lecture takes under a minute. Its extra errors are mostly dropped repetitions and fillers ("I am I am" → "I am"). It has no second model, so the review list only contains VAD-based checks (words in silence, speech without words, repetition loops). Use `--preset accurate` when every word matters, or for a recording with heavy disfluency.
+`fast` mostly loses repeated words and fillers ("I am I am" → "I am"). Other languages work with Qwen3 (`--preset qwen3-8bit --language de`) but are not benchmarked.
 
-### Course vocabulary
+## Learn more
 
-A UTF-8 text file with one term per line. Lines starting with `#` are ignored. Spell terms exactly as they should appear:
+- [MODEL_CHOICE.md](docs/MODEL_CHOICE.md): why these models, in one page
+- [RESULTS.md](docs/RESULTS.md): accuracy, speed, memory, failure modes
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md): how it works
+- Benchmark it yourself: `pip install -e ".[eval]"`, then `hearken eval --help`
+- Tests: `pip install -e ".[dev]" && pytest` (seconds, no models needed)
 
-```
-# MATH 241
-Lagrangian
-Cauchy-Schwarz
-eigendecomposition
-Tikhonov
-```
-
-Use it to measure whether vocabulary helps on *your* lectures: transcribe a 10-minute excerpt, correct it by hand into `ref.txt`, then run `hearken eval score out/excerpt.json ref.txt` with and without `--vocab`.
-
-### Other languages
-
-`--language de` (etc.) works with the Qwen3-ASR and Whisper engines. Parakeet TDT v2 is English-only; `parakeet-tdt-0.6b-v3` covers 25 European languages. Only English has been benchmarked.
-
-## Benchmark yourself
-
-```bash
-pip install -e ".[eval]"
-hearken eval prepare-tedlium path/to/tedlium-long-form/test.parquet --out data/eval/tedlium
-hearken eval terms --out data/eval/terms
-hearken eval run data/eval/tedlium/manifest.jsonl --preset accurate --preset fast --out bench_results/ted
-```
-
-Your own recordings: write a manifest line `{"id": "...", "audio": "x.m4a", "reference": "x.txt"}` per file.
-
-## Tests
-
-```bash
-pip install -e ".[dev]" && pytest
-```
-
-The unit and pipeline tests use a synthetic engine and run in seconds without models.
+MIT licensed. Model weights: Parakeet CC-BY-4.0, Qwen3-ASR Apache-2.0.

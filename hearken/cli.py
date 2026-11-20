@@ -138,14 +138,18 @@ def cmd_review(a: argparse.Namespace) -> int:
 
 
 def cmd_reformat(a: argparse.Namespace) -> int:
-    from .pipeline import load_raw, render_from_raw
+    from .pipeline import load_raw, media_ref, render_from_raw
 
     raw_path = Path(a.raw)
     raw = load_raw(raw_path)
     out = Path(a.output) if a.output else raw_path.parent
     stem = raw_path.name.split(".raw.")[0]
     opts = _run_options(a)
-    outputs = render_from_raw(raw, raw_path, out, stem, opts, raw["source"]["name"])
+    name = raw["source"]["name"]
+    # The source normally sits next to, or one level above, the transcript folder.
+    media = next((d / name for d in (raw_path.parent, raw_path.parent.parent) if (d / name).is_file()), None)
+    ref = media_ref(media, out) if media else name
+    outputs = render_from_raw(raw, raw_path, out, stem, opts, ref)
     outputs.pop("_n_uncertain")
     for k, p in outputs.items():
         print(f"  {k:5} {p}")
