@@ -55,7 +55,7 @@ class ParakeetEngine(Engine):
 
     def __init__(self, model_key: str = "parakeet-tdt-0.6b-v2", *, beam_size: int = 1,
                  boost_weight: float = 2.0, max_chunk_s: float = 120.0, pad_s: float = 5.0,
-                 frontend: str = "nemo"):
+                 frontend: str = "nemo", batch_size: int = 16):
         self.model_key = model_key
         self.beam_size = beam_size
         self.boost_weight = boost_weight
@@ -64,6 +64,8 @@ class ParakeetEngine(Engine):
         if frontend not in ("nemo", "library"):
             raise ValueError(f"unknown frontend {frontend!r}")
         self.frontend = frontend
+        self.batch_size = batch_size
+        self.fixed_window = True  # constant encoder shapes; see chunking.plan_chunks
         self._model = None
         self._booster_vocab: tuple[str, ...] | None = None
         self._decoding = None
@@ -71,6 +73,10 @@ class ParakeetEngine(Engine):
     def load(self) -> None:
         from parakeet_mlx import from_pretrained
 
+        import mlx.core as mx
+
+        # Bound MLX's buffer cache: it otherwise holds freed buffers indefinitely.
+        mx.set_cache_limit(1 << 30)
         path = models.resolve_local(self.model_key)
         try:
             self._model = from_pretrained(str(path))
@@ -117,9 +123,48 @@ class ParakeetEngine(Engine):
         toks = [(t.text, t.start, t.end, t.confidence) for t in result.tokens]
         return words_from_tokens(toks)
 
+    def transcribe_batch(self, audios: list[np.ndarray], ctxs: list[ChunkContext]) -> list[list[Word]]:
+        """Encode chunks one by one (GPU-bound), then decode them all in lockstep.
+
+        Only greedy decoding without vocabulary is batched; beam search and
+        boosting fall back to the per-chunk path.
+        """
+        import mlx.core as mx
+        from parakeet_mlx.audio import get_logmel
+        from parakeet_mlx.tokenizer import decode as detok
+
+        from .tdt_batch import decode_greedy_batch
+
+        if self._model is None:
+            raise EngineError("engine not loaded")
+        if self.beam_size > 1 or any(c.vocabulary for c in ctxs) or len(audios) == 1:
+            return super().transcribe_batch(audios, ctxs)
+        m = self._model
+        cfg = m.preprocessor_config
+        try:
+            feats, keep = [], []
+            for i, a in enumerate(audios):
+                if len(a) < cfg.hop_length * 4:
+                    continue
+                x = mx.array(np.asarray(a, dtype=np.float32))
+                mel = nemo_logmel(x, cfg) if self.frontend == "nemo" else get_logmel(x, cfg)
+                f, _ = m.encoder(mel.astype(mx.bfloat16))
+                mx.eval(f)
+                feats.append(f[0])
+                keep.append(i)
+            decoded = decode_greedy_batch(m, feats)
+        except Exception as e:
+            raise EngineError(f"parakeet batched decoding failed: {e}") from e
+        out: list[list[Word]] = [[] for _ in audios]
+        for i, toks in zip(keep, decoded):
+            out[i] = words_from_tokens([(detok([t], m.vocabulary), s, s + d, c) for t, s, d, c in toks])
+        return out
+
     def describe(self) -> dict:
         s = models.spec(self.model_key)
         return {"engine": self.name, "model": s.key, "repo": s.repo, "revision": s.revision,
                 "license": s.license, "decoding": "beam" if self.beam_size > 1 else "greedy",
                 "beam_size": self.beam_size, "boost_weight": self.boost_weight, "frontend": self.frontend,
-                "max_chunk_s": self.max_chunk_s, "pad_s": self.pad_s}
+                "max_chunk_s": self.max_chunk_s, "pad_s": self.pad_s,
+                "decoder": "hearken batched TDT greedy" if self.beam_size <= 1 else "parakeet-mlx beam",
+                "batch_size": self.batch_size}

@@ -32,8 +32,9 @@ class BurstEngine(Engine):
 
     name = "burst"
 
-    def __init__(self, max_chunk_s=20.0, pad_s=2.0, **_):
+    def __init__(self, max_chunk_s=20.0, pad_s=2.0, fixed_window=False, batch_size=1, **_):
         self.max_chunk_s, self.pad_s = max_chunk_s, pad_s
+        self.fixed_window, self.batch_size = fixed_window, batch_size
         self.calls = 0
 
     def load(self):

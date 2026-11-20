@@ -130,3 +130,14 @@ def test_snap_onsets_moves_only_starts_in_silence():
     tail = Word("tail", 3.5, 4.8)          # ends 0.8 s into the pause
     assert snap_onsets([tail], speech) == 1 and abs(tail.end - 4.0) <= FRAME_S and tail.start == 3.5
     assert (ok.start, ghost.start) == (3.1, 6.0)
+
+
+@pytest.mark.parametrize("duration", [50.0, 400.0, 3 * 3600.0])
+def test_fixed_windows_have_constant_length_and_contain_core(duration):
+    speech = probs_from_regions(duration, [(t, t + 2.5) for t in np.arange(0, duration, 3.0)])
+    chunks = plan_chunks(duration, speech, max_len=120.0, pad=5.0, fixed_window=True)
+    want = min(120.0, duration)
+    for c in chunks:
+        assert abs((c.pad_end - c.pad_start) - want) < 1e-6
+        assert c.pad_start <= c.core_start and c.core_end <= c.pad_end
+        assert c.pad_start >= 0 and c.pad_end <= duration + 1e-9

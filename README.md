@@ -70,7 +70,7 @@ hearken reformat out/lecture.raw.json --mode verbatim --no-markers
 
 | preset | what | TED WER | time per audio hour | peak memory |
 |---|---|---|---|---|
-| `fast` (default) | Parakeet TDT v2 only, no cross-check | 3.0% | ~1 min | 2.4 GB |
+| `fast` (default) | Parakeet TDT v2 only, no cross-check | 3.1% | ~20 s | 2.3 GB |
 | `accurate` | Qwen3-ASR 1.7B 8-bit transcript, Parakeet cross-check | 2.2% | ~4.3 min | 6.2 GB |
 | `accurate-full` | same, full-precision Qwen3 (no more accurate) | 2.2% | ~5.5 min | 8.2 GB |
 | `qwen3-8bit`, `qwen3` | Qwen3 only, no cross-check | 2.2% | ~4 / ~6 min | 6.2 / 8.2 GB |
@@ -78,7 +78,7 @@ hearken reformat out/lecture.raw.json --mode verbatim --no-markers
 
 Measured on an M5 Pro with 24 GB. `hearken presets` lists all presets.
 
-`fast` is the default because it is ~4× faster and ~2.5× lighter. Its extra errors are mostly dropped repetitions and fillers ("I am I am" → "I am"). It has no second model, so the review list only contains VAD-based checks (words in silence, speech without words, repetition loops). Use `--preset accurate` when every word matters, or for a recording with heavy disfluency.
+`fast` is the default because it is ~14× faster and ~2.5× lighter: a 3-hour lecture takes about a minute. Its extra errors are mostly dropped repetitions and fillers ("I am I am" → "I am"). It has no second model, so the review list only contains VAD-based checks (words in silence, speech without words, repetition loops). Use `--preset accurate` when every word matters, or for a recording with heavy disfluency.
 
 ### Course vocabulary
 

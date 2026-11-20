@@ -107,11 +107,22 @@ The differences are 0–2 words out of 278, so **no measurable effect** at this 
 
 | | default `fast` | `accurate` |
 |---|---|---|
-| processing per audio hour | ~1 min (3 h lecture ≈ 3 min) | ~4.3 min (3 h ≈ 13 min) |
+| processing per audio hour | ~20 s (3 h lecture ≈ 1 min) | ~4.3 min (3 h ≈ 13 min)† |
 | peak unified (GPU) memory | 2.4 GB | 6.2 GB |
 | model disk | 2.5 GB | 6.8 GB |
 
+† `accurate` was measured before the batched Parakeet decoder. Its Parakeet share is now smaller, so ~4.3 min is an upper bound.
+
 Audio is memory-mapped in both: 3 h of audio is 0.7 GB.
+
+### Batched decoding (`fast`, after the concurrency change)
+
+| | WER (10 TED talks) | sub / del / ins | RTF | peak MLX |
+|---|---|---|---|---|
+| per-chunk decoding (before) | 3.04% | 261 / 450 / 96 | 0.017 | 2.4 GB |
+| constant windows + batched TDT decoding | 3.07% | 265 / 455 / 94 | **0.005** | 2.3 GB |
+
+The 0.03-point difference is 7 words out of 26,513, with per-talk changes in both directions (bf16 rounding on near-tie tokens). Design and the alternatives that were measured and rejected: ARCHITECTURE.md, "Concurrency".
 
 ## Known failure modes
 

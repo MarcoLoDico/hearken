@@ -47,6 +47,19 @@ Each chunk has a *core* and a *padded* interval. Cores tile the recording exactl
 
 Chunk length per engine: Parakeet 120 s (5 s pad); Qwen3-ASR and Whisper 30 s (1.5 s pad), which is one native window and avoids their internal seek logic.
 
+Are breaks a source of errors? Across the 10 TED talks, all 84 Parakeet cuts landed where the VAD speech probability was 0. The word error rate within 2 s of a cut was 4.9%, vs 4.1% elsewhere: a difference of ~7 words out of 822, ~1.2 standard errors. There is no measurable loss at breaks, so no extra boundary pass is run.
+
+### Concurrency (Parakeet)
+
+Profiling one 120 s chunk: spectrogram 1%, Conformer encoder ~41% (GPU-compute-bound), TDT decoding loop ~59%. parakeet-mlx's loop makes three host↔GPU syncs per step for a tiny LSTM/joint step, so it is latency-bound. Measured alternatives that did *not* help: multiple worker processes (1 → 4 workers: 13.0 → 15.9 s, the GPU is shared), decoding on CPU (2× slower, and bf16 CPU numerics change output), batching the encoder (0.3–0.8×: already compute-saturated), and more VAD streams.
+
+What hearken does instead:
+
+1. **Constant-shape windows.** Every Parakeet window is exactly 120 s of real audio. A shorter core simply gets more context on each side. MLX keeps a buffer set per tensor shape. With variable windows, encoding a 25-minute talk took 16 s and grew the cache to 16.8 GB; with constant windows it takes 6 s and the cache stays at 1.6 GB. The MLX cache is also capped at 1 GB.
+2. **Lockstep batched TDT decoding** (`engines/tdt_batch.py`). Up to 16 chunks decode together. The joint network's encoder projection is computed once for all frames, each step is one batched joint evaluation with a single sync, and the LSTM runs only for chunks that emitted a token. It applies the same decoding rule as parakeet-mlx. It also avoids parakeet-mlx's LSTM wrapper, which mixes up time and batch axes and is only correct at batch size 1.
+
+Result on a 25-minute talk: the Parakeet stage drops from 27.8 s to 3.7 s and the whole run from 33.5 s to 5.7 s. On all 10 TED talks, WER is 3.07% vs 3.04% (7 words out of 26,513; bf16 rounding on near-ties, differences in both directions). Beam search and vocabulary boosting still use the per-chunk library path.
+
 ## Model survey and selection
 
 Candidates were limited to models that are open-weights, run natively on Apple Silicon (MLX), and fit comfortably in 24 GB of unified memory.
@@ -59,7 +72,7 @@ Candidates were limited to models that are open-weights, run natively on Apple S
 | Nemotron 3.5 Transcribe (30B-A4B) | 30 B MoE | OpenMDW | speech-LLM | leaderboard leader (late 2026) | ~35 GB even at 8-bit: does not fit a 24 GB Mac |
 | Cohere Transcribe, Granite Speech 4.x, Canary | 1–8 B | various | — | competitive WER | no maintained MLX port at time of writing, or NeMo/CUDA-centric |
 
-**Decision (from the benchmark, not leaderboard claims).** The default preset `fast` uses Parakeet TDT v2 alone (greedy): 3.04% WER at ~1 min per audio hour and 2.4 GB. It was chosen for speed and footprint; its extra errors are mostly dropped disfluencies. For maximum fidelity, `accurate` uses Qwen3-ASR 1.7B with 8-bit weights as the primary: 2.21% WER on TED-LIUM long-form vs 3.04% for Parakeet and 3.50% for Whisper, zero words in inserted silence, and the best timestamps. 8-bit weights are as accurate as bf16 and 32% faster. Parakeet TDT v2 (greedy) is the verifier. It is architecturally different (transducer vs. LLM decoder, different training data), so its errors are largely independent of Qwen3's, and it costs ~10–15% extra time. Its disagreements cover 1.8% of words and contain 17% of the primary's errors. Whisper is optional. The short version is in [MODEL_CHOICE.md](MODEL_CHOICE.md); full numbers are in [RESULTS.md](RESULTS.md).
+**Decision (from the benchmark, not leaderboard claims).** The default preset `fast` uses Parakeet TDT v2 alone (greedy): 3.07% WER at ~20 s per audio hour and 2.3 GB (with the batched decoder below). It was chosen for speed and footprint; its extra errors are mostly dropped disfluencies. For maximum fidelity, `accurate` uses Qwen3-ASR 1.7B with 8-bit weights as the primary: 2.21% WER on TED-LIUM long-form vs 3.04% for Parakeet and 3.50% for Whisper, zero words in inserted silence, and the best timestamps. 8-bit weights are as accurate as bf16 and 32% faster. Parakeet TDT v2 (greedy) is the verifier. It is architecturally different (transducer vs. LLM decoder, different training data), so its errors are largely independent of Qwen3's, and it costs ~10–15% extra time. Its disagreements cover 1.8% of words and contain 17% of the primary's errors. Whisper is optional. The short version is in [MODEL_CHOICE.md](MODEL_CHOICE.md); full numbers are in [RESULTS.md](RESULTS.md).
 
 ### Why the verifier does not vote
 

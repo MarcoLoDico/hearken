@@ -30,6 +30,10 @@ class Engine(abc.ABC):
     max_chunk_s: float = 30.0
     #: context padding on each side of a chunk core
     pad_s: float = 2.0
+    #: chunks handed to transcribe_batch at once (1 = no batching)
+    batch_size: int = 1
+    #: make every padded chunk window exactly max_chunk_s long (constant shapes)
+    fixed_window: bool = False
 
     @abc.abstractmethod
     def load(self) -> None: ...
@@ -37,6 +41,10 @@ class Engine(abc.ABC):
     @abc.abstractmethod
     def transcribe_chunk(self, audio: np.ndarray, ctx: ChunkContext) -> list[Word]:
         """Return words with timestamps relative to the start of ``audio``."""
+
+    def transcribe_batch(self, audios: list[np.ndarray], ctxs: list[ChunkContext]) -> list[list[Word]]:
+        """Transcribe several independent chunks. Engines override this when they can batch."""
+        return [self.transcribe_chunk(a, c) for a, c in zip(audios, ctxs)]
 
     def unload(self) -> None:
         import gc

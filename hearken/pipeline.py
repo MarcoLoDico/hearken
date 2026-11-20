@@ -76,49 +76,74 @@ def _peak_metrics() -> dict:
     return {"peak_rss_gb": round(rss_gb, 3), "peak_mlx_gb": round(gpu, 3) if gpu is not None else None}
 
 
+def _transcribe_one(engine: Engine, seg: np.ndarray, ctx: ChunkContext, index: int) -> tuple[list[Word], str | None]:
+    """Per-chunk path with one retry; a failure is recorded, not raised."""
+    error = None
+    for attempt in (1, 2):
+        try:
+            return engine.transcribe_chunk(seg, ctx), None
+        except EngineError as e:
+            error = str(e)
+            log.warning("%s chunk %d attempt %d failed: %s", engine.name, index, attempt, e)
+    return [], error
+
+
 def run_engine(engine: Engine, samples: np.ndarray, duration: float, speech: vad_mod.SpeechProbs,
                vocabulary: list[str], language: str, progress: Progress | None = None,
                label: str = "") -> EngineResult:
+    """Transcribe the whole recording with one engine.
+
+    Chunks are handed to the engine ``engine.batch_size`` at a time; engines
+    that can decode several chunks concurrently (Parakeet) do so. If a batch
+    fails, its chunks are retried one by one. Every chunk's words are then
+    clipped to its padded window and kept only if their midpoint lies in its
+    core, so batching cannot change which words survive.
+    """
     sr = audio_mod.SAMPLE_RATE
-    chunks = plan_chunks(duration, speech, max_len=engine.max_chunk_s, pad=engine.pad_s)
+    chunks = plan_chunks(duration, speech, max_len=engine.max_chunk_s, pad=engine.pad_s,
+                         fixed_window=getattr(engine, "fixed_window", False))
     words: list[Word] = []
     meta = []
     prev = ""
     t_engine = time.perf_counter()
-    for c in chunks:
-        last = c.index == len(chunks) - 1
-        seg = np.asarray(samples[int(c.pad_start * sr):int(c.pad_end * sr)], dtype=np.float32)
+    bs = max(1, int(getattr(engine, "batch_size", 1)))
+    for g in range(0, len(chunks), bs):
+        group = chunks[g:g + bs]
+        segs = [np.asarray(samples[int(c.pad_start * sr):int(c.pad_end * sr)], dtype=np.float32) for c in group]
         t0 = time.perf_counter()
-        error = None
-        raw: list[Word] = []
-        for attempt in (1, 2):
+        results: list[tuple[list[Word], str | None]]
+        if len(group) == 1:
+            results = [_transcribe_one(engine, segs[0], ChunkContext(vocabulary, prev, language), group[0].index)]
+        else:
+            ctxs = [ChunkContext(vocabulary, "", language) for _ in group]
             try:
-                raw = engine.transcribe_chunk(seg, ChunkContext(vocabulary, prev, language))
-                error = None
-                break
+                results = [(r, None) for r in engine.transcribe_batch(segs, ctxs)]
             except EngineError as e:
-                error = str(e)
-                log.warning("%s chunk %d attempt %d failed: %s", engine.name, c.index, attempt, e)
-        kept = []
-        for w in raw:
-            w.start = min(max(w.start + c.pad_start, c.pad_start), c.pad_end)
-            w.end = min(max(w.end + c.pad_start, w.start), c.pad_end)
-            if c.owns(w.mid, last):
-                kept.append(w)
-        # Enforce monotonic timestamps across chunk joins.
-        if words and kept and kept[0].start < words[-1].end:
-            for w in kept:
-                if w.start < words[-1].end:
-                    w.start = words[-1].end
-                    w.end = max(w.end, w.start)
-        words += kept
-        prev = " ".join(w.text for w in words[-40:])
-        meta.append({"index": c.index, "core": [round(c.core_start, 3), round(c.core_end, 3)],
-                     "padded": [round(c.pad_start, 3), round(c.pad_end, 3)], "words_decoded": len(raw),
-                     "words_kept": len(kept), "seconds": round(time.perf_counter() - t0, 3),
-                     **({"error": error} if error else {})})
+                log.warning("%s batch of %d chunks failed (%s); retrying one by one", engine.name, len(group), e)
+                results = [_transcribe_one(engine, sg, cx, c.index) for sg, cx, c in zip(segs, ctxs, group)]
+        per_chunk_s = (time.perf_counter() - t0) / len(group)
+        for c, (raw, error) in zip(group, results):
+            last = c.index == len(chunks) - 1
+            kept = []
+            for w in raw:
+                w.start = min(max(w.start + c.pad_start, c.pad_start), c.pad_end)
+                w.end = min(max(w.end + c.pad_start, w.start), c.pad_end)
+                if c.owns(w.mid, last):
+                    kept.append(w)
+            # Enforce monotonic timestamps across chunk joins.
+            if words and kept and kept[0].start < words[-1].end:
+                for w in kept:
+                    if w.start < words[-1].end:
+                        w.start = words[-1].end
+                        w.end = max(w.end, w.start)
+            words += kept
+            prev = " ".join(w.text for w in words[-40:])
+            meta.append({"index": c.index, "core": [round(c.core_start, 3), round(c.core_end, 3)],
+                         "padded": [round(c.pad_start, 3), round(c.pad_end, 3)], "words_decoded": len(raw),
+                         "words_kept": len(kept), "seconds": round(per_chunk_s, 3),
+                         **({"error": error} if error else {})})
         if progress:
-            progress(label or engine.name, c.core_end / duration, f"chunk {c.index + 1}/{len(chunks)}")
+            progress(label or engine.name, group[-1].core_end / duration, f"chunk {group[-1].index + 1}/{len(chunks)}")
     return EngineResult(engine.name, engine.describe(), words, meta, time.perf_counter() - t_engine)
 
 

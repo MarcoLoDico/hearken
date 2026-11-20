@@ -37,7 +37,7 @@ PRESETS: dict[str, Preset] = {
                (EngineSpec("qwen3", {"model_key": "qwen3-asr-1.7b-8bit"}), EngineSpec("parakeet", {"beam_size": 1}))),
         Preset("accurate-full", "As 'accurate' with full-precision Qwen3 weights. Measured no more accurate; ~8 GB.",
                (EngineSpec("qwen3", {}), EngineSpec("parakeet", {"beam_size": 1}))),
-        Preset("fast", "Default. Parakeet TDT v2 only. ~1 min per audio hour, ~2.4 GB. Drops some repetitions/fillers; "
+        Preset("fast", "Default. Parakeet TDT v2 only. ~20 s per audio hour, ~2.3 GB. Drops some repetitions/fillers; "
                "no cross-check.", (EngineSpec("parakeet", {"beam_size": 1}),)),
         Preset("qwen3-8bit", "Qwen3-ASR 1.7B 8-bit only (no cross-check).",
                (EngineSpec("qwen3", {"model_key": "qwen3-asr-1.7b-8bit"}),)),

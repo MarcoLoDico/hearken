@@ -34,8 +34,16 @@ class Chunk:
 
 
 def plan_chunks(duration: float, vad: SpeechProbs, *, max_len: float, pad: float,
-                min_len: float | None = None) -> list[Chunk]:
-    """Plan chunks whose padded length never exceeds ``max_len`` seconds."""
+                min_len: float | None = None, fixed_window: bool = False) -> list[Chunk]:
+    """Plan chunks whose padded length never exceeds ``max_len`` seconds.
+
+    With ``fixed_window``, every padded window is exactly ``max_len`` seconds
+    (or the whole file, if shorter): a short core gets extra real-audio context
+    instead of a shorter window. Ownership still follows the cores, so the
+    words kept are unaffected. This keeps tensor shapes constant: MLX caches
+    buffers per shape, and varying shapes cost ~3x encoder time and >10 GB of
+    cache on a 25-minute file.
+    """
     core_max = max_len - 2 * pad
     if core_max <= 1.0:
         raise ValueError("max_len too small for the requested padding")
@@ -66,5 +74,13 @@ def plan_chunks(duration: float, vad: SpeechProbs, *, max_len: float, pad: float
 
     chunks = []
     for i, (a, b) in enumerate(zip(cuts[:-1], cuts[1:])):
-        chunks.append(Chunk(i, a, b, max(0.0, a - pad), min(duration, b + pad)))
+        p0, p1 = max(0.0, a - pad), min(duration, b + pad)
+        if fixed_window:
+            if duration <= max_len:
+                p0, p1 = 0.0, duration
+            else:
+                extra = max_len - (b - a)
+                p0 = min(max(0.0, a - extra / 2), duration - max_len)
+                p1 = p0 + max_len
+        chunks.append(Chunk(i, a, b, p0, p1))
     return chunks

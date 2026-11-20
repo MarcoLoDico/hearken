@@ -1,6 +1,6 @@
 # Model choice
 
-**Default preset `fast`: Parakeet TDT 0.6B v2 alone.** It is ~4× faster and ~2.5× lighter than the most accurate configuration, for a modest accuracy cost (3.0% vs 2.2% WER on TED lectures). Most of that cost is dropped repetitions and fillers, not misheard content words. That trade was chosen deliberately, as the better fit for everyday lecture notes.
+**Default preset `fast`: Parakeet TDT 0.6B v2 alone.** It is ~14× faster and ~2.5× lighter than the most accurate configuration (about 20 s per audio hour), for a modest accuracy cost (3.1% vs 2.2% WER on TED lectures). Most of that cost is dropped repetitions and fillers, not misheard content words. That trade was chosen deliberately, as the better fit for everyday lecture notes.
 
 **Most accurate preset `accurate`:** Qwen3-ASR 1.7B with 8-bit weights writes the transcript. NVIDIA Parakeet TDT 0.6B v2 independently re-transcribes the audio, and every place it disagrees is flagged for review. Parakeet never changes the text.
 
@@ -36,7 +36,7 @@ It is exactly as accurate as full precision (2.21% vs 2.20%, with per-talk diffe
 ## What was rejected, and why
 
 - **Whisper large-v3 (mlx-whisper, whisper.cpp):** worst accuracy, most repeated and invented words, and needs PyTorch. whisper.cpp runs the same weights, so it would be lighter but no more accurate. Kept only as an optional baseline.
-- **Parakeet as primary (now the default, `fast`):** 4× faster and 2.5× lighter, at 38% more errors. The extra errors are mostly dropped disfluencies. No cross-check, so far fewer errors are flagged for review.
+- **Parakeet as primary (now the default, `fast`):** ~14× faster (with hearken's batched decoder) and 2.5× lighter, at ~39% more errors. The extra errors are mostly dropped disfluencies. No cross-check, so far fewer errors are flagged for review.
 - **Parakeet beam search:** no gain over greedy (3.04% both) at 3× the cost.
 - **Nemotron 3.5 Transcribe (30B):** tops the late-2026 leaderboard but needs ~35 GB even at 8-bit, so it doesn't fit a 24 GB Mac.
 - **Cohere Transcribe, Granite Speech, Canary:** no maintained Apple Silicon (MLX) build.

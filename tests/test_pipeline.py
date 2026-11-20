@@ -53,14 +53,19 @@ def fake_env(monkeypatch, tmp_path):
     return created
 
 
+@pytest.mark.parametrize("batch", [1, 4])
+@pytest.mark.parametrize("fixed", [False, True])
 @pytest.mark.parametrize("pad", [0.0, 2.0])
-def test_no_word_lost_or_duplicated_across_chunks(fake_env, tmp_path, pad):
+def test_no_word_lost_or_duplicated_across_chunks(fake_env, tmp_path, pad, fixed, batch):
     x, onsets = burst_signal(60, gap=0.9, long_pause_every=7, long_pause=1.5)
     src = tmp_path / "lecture.wav"
     _write(src, x)
     opts = pipeline.RunOptions(preset="fake", formats=("json",))
-    if pad == 0.0:
-        opts.engine_overrides = {"burst": {"pad_s": 0.0001}}
+    over = {"pad_s": 0.0001} if pad == 0.0 else {}
+    if fixed:
+        over["fixed_window"] = True
+    over["batch_size"] = batch
+    opts.engine_overrides = {"burst": over}
     res = pipeline.transcribe_file(src, tmp_path / "out", opts)
     doc = json.loads(res.outputs["json"].read_text())
     names = [w["text"] for w in doc["words"]]
