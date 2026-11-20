@@ -30,6 +30,10 @@ log = logging.getLogger(__name__)
 
 FORMATS = ("txt", "srt", "vtt", "json", "html")
 RAW_SCHEMA = "hearken.raw/1"
+# MLX keeps freed buffers in a cache for reuse, and macOS charges that cache to
+# the process. Uncapped, it reached 16.8 GB (Parakeet, variable windows) and
+# added 1.8 GB for Qwen3. 1 GB costs no measurable speed.
+MLX_CACHE_LIMIT = 1 << 30
 DOC_SCHEMA = "hearken.transcript/1"
 
 Progress = Callable[[str, float, str], None]  # (stage, fraction 0..1, detail)
@@ -65,6 +69,30 @@ def _sha256(path: Path) -> str:
     return h.hexdigest()
 
 
+def peak_footprint_bytes() -> int | None:
+    """Lifetime peak physical footprint of this process, as macOS accounts it.
+
+    This is the number Activity Monitor shows as "Memory" and that
+    ``/usr/bin/time -l`` reports as "peak memory footprint". Unlike
+    ``mx.get_peak_memory()`` it includes MLX's buffer cache and GPU
+    allocations, and unlike ru_maxrss it counts compressed and swapped pages.
+    """
+    if platform.system() != "Darwin":
+        return None
+    import ctypes
+
+    # struct rusage_info_v4: 16-byte uuid followed by uint64 fields;
+    # ri_lifetime_max_phys_footprint is the 29th of those fields.
+    buf = (ctypes.c_uint64 * 40)()
+    try:
+        libc = ctypes.CDLL("/usr/lib/libSystem.B.dylib")
+        if libc.proc_pid_rusage(os.getpid(), 4, ctypes.byref(buf)) != 0:  # RUSAGE_INFO_V4
+            return None
+    except OSError:
+        return None
+    return int(buf[2 + 28])
+
+
 def _peak_metrics() -> dict:
     try:
         import mlx.core as mx
@@ -73,7 +101,9 @@ def _peak_metrics() -> dict:
         gpu = None
     rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     rss_gb = rss / 1e9 if platform.system() == "Darwin" else rss / 1e6  # bytes on macOS, KiB on Linux
-    return {"peak_rss_gb": round(rss_gb, 3), "peak_mlx_gb": round(gpu, 3) if gpu is not None else None}
+    fp = peak_footprint_bytes()
+    return {"peak_footprint_gb": round(fp / 1e9, 3) if fp is not None else None,
+            "peak_rss_gb": round(rss_gb, 3), "peak_mlx_active_gb": round(gpu, 3) if gpu is not None else None}
 
 
 def _transcribe_one(engine: Engine, seg: np.ndarray, ctx: ChunkContext, index: int) -> tuple[list[Word], str | None]:
@@ -193,6 +223,9 @@ def transcribe_file(src: str | Path, out_dir: str | Path, opts: RunOptions,
             progress("vad", 0.0, "")
         speech = vad_mod.detect(decoded.samples, models.vad_path())
         timings["vad_s"] = time.perf_counter() - t
+
+        import mlx.core as mx
+        mx.set_cache_limit(MLX_CACHE_LIMIT)
 
         results: list[EngineResult] = []
         for i, es in enumerate(preset.engines):

@@ -13,7 +13,7 @@ Why these models, in one page: [docs/MODEL_CHOICE.md](docs/MODEL_CHOICE.md). Des
 
 - macOS on Apple Silicon (M1 or later), Python 3.10–3.13
 - ~2.5 GB free disk for the default model (~7 GB more for `accurate`)
-- 8 GB unified memory is enough for the default preset (peak ~2.4 GB); `accurate` needs ~6 GB
+- 8 GB unified memory is enough for the default preset (peak ~3.2 GB); `accurate` peaks at ~6.7 GB, so 16 GB is recommended for it
 
 No system `ffmpeg` needed: decoding uses PyAV's bundled FFmpeg libraries.
 
@@ -68,17 +68,17 @@ hearken reformat out/lecture.raw.json --mode verbatim --no-markers
 
 ### Presets
 
-| preset | what | TED WER | time per audio hour | peak memory |
+| preset | what | TED WER | time per audio hour | peak RAM |
 |---|---|---|---|---|
-| `fast` (default) | Parakeet TDT v2 only, no cross-check | 3.1% | ~20 s | 2.3 GB |
-| `accurate` | Qwen3-ASR 1.7B 8-bit transcript, Parakeet cross-check | 2.2% | ~4.3 min | 6.2 GB |
-| `accurate-full` | same, full-precision Qwen3 (no more accurate) | 2.2% | ~5.5 min | 8.2 GB |
-| `qwen3-8bit`, `qwen3` | Qwen3 only, no cross-check | 2.2% | ~4 / ~6 min | 6.2 / 8.2 GB |
-| `triple`, `whisper` | add / use Whisper large-v3 (needs `.[whisper]`) | 3.5% (Whisper) | ~8 min | 4.0 GB |
+| `fast` (default) | Parakeet TDT v2 only, no cross-check | 3.1% | ~16 s | 3.2 GB |
+| `accurate` | Qwen3-ASR 1.7B 8-bit transcript, Parakeet cross-check | 2.2% | ~3.2 min | 6.7 GB |
+| `accurate-full` | same, full-precision Qwen3 (no more accurate) | 2.2% | ~4.7 min | 8.3 GB |
+| `qwen3-8bit`, `qwen3` | Qwen3 only, no cross-check | 2.2% | ~3 / ~4.5 min | 6.7 / 8.3 GB |
+| `triple`, `whisper` | add / use Whisper large-v3 (needs `.[whisper]`) | 3.5% (Whisper) | ~8 min | not re-measured* |
 
-Measured on an M5 Pro with 24 GB. `hearken presets` lists all presets.
+Measured on an M5 Pro with 24 GB. "Peak RAM" is the process's peak memory footprint as macOS reports it (Activity Monitor's "Memory"), including MLX's GPU buffers and cache. \*Whisper's live MLX allocations peaked at 4.0 GB; its full footprint was not re-measured. `hearken presets` lists all presets.
 
-`fast` is the default because it is ~14× faster and ~2.5× lighter: a 3-hour lecture takes about a minute. Its extra errors are mostly dropped repetitions and fillers ("I am I am" → "I am"). It has no second model, so the review list only contains VAD-based checks (words in silence, speech without words, repetition loops). Use `--preset accurate` when every word matters, or for a recording with heavy disfluency.
+`fast` is the default because it is ~12× faster and needs about half the memory: a 3-hour lecture takes under a minute. Its extra errors are mostly dropped repetitions and fillers ("I am I am" → "I am"). It has no second model, so the review list only contains VAD-based checks (words in silence, speech without words, repetition loops). Use `--preset accurate` when every word matters, or for a recording with heavy disfluency.
 
 ### Course vocabulary
 

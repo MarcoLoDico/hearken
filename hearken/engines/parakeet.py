@@ -73,10 +73,6 @@ class ParakeetEngine(Engine):
     def load(self) -> None:
         from parakeet_mlx import from_pretrained
 
-        import mlx.core as mx
-
-        # Bound MLX's buffer cache: it otherwise holds freed buffers indefinitely.
-        mx.set_cache_limit(1 << 30)
         path = models.resolve_local(self.model_key)
         try:
             self._model = from_pretrained(str(path))

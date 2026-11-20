@@ -2,6 +2,8 @@
 
 Measured 2026-11-18 on an Apple M5 Pro with 24 GB unified memory, macOS 26.6, Python 3.12, MLX 0.32.4. The models are pinned to the commits in `hearken/models.py`. Every number below comes from `hearken eval` and can be regenerated with `scripts/run_benchmarks.sh` and `scripts/run_benchmarks_2.sh`.
 
+**Memory figures.** "Peak RAM" is the process's lifetime peak physical footprint as macOS accounts it: Activity Monitor's "Memory", `/usr/bin/time -l`'s "peak memory footprint". It includes MLX's GPU buffers and buffer cache. The first benchmark round recorded only *live* MLX allocations (`mx.get_peak_memory()`) and RSS. Live MLX leaves out the buffer cache, which at the time was uncapped, so those columns understate real RAM use. Parakeet with variable-length windows actually peaked at ~18 GB. Current presets were re-measured after the fix; see "Speed and memory summary".
+
 The benchmark directories use earlier preset labels: `parakeet-greedy` = `fast`, `parakeet` = `parakeet-beam`, `max` = `accurate-full`, `max-8bit` = `accurate`.
 
 ## Data
@@ -16,7 +18,7 @@ All WER/CER figures use Whisper's English normaliser (the Open ASR Leaderboard c
 
 ## Accuracy: TED-LIUM long-form
 
-| configuration | WER | CER | sub | del | ins | words in deletion runs ≥ 5 | duplicated* | RTF | peak MLX | peak RSS |
+| configuration | WER | CER | sub | del | ins | words in deletion runs ≥ 5 | duplicated* | RTF | live MLX (understates RAM) | peak RSS |
 |---|---|---|---|---|---|---|---|---|---|---|
 | **Qwen3-ASR 1.7B 8-bit** | **2.21%** | 1.21% | 255 | 237 | 95 | 19 | 14 | 0.067 | 6.2 GB | 3.2 GB |
 | Qwen3-ASR 1.7B bf16 | 2.20% | 1.19% | 253 | 232 | 98 | 19 | 15 | 0.099 | 8.2 GB | 4.4 GB |
@@ -25,7 +27,7 @@ All WER/CER figures use Whisper's English normaliser (the Open ASR Leaderboard c
 | Parakeet, beam 4, library front-end | 3.06% | 1.84% | 262 | 463 | 86 | 14 | 0 | 0.046 | 2.4 GB | 1.2 GB |
 | Whisper large-v3 | 3.50% | 2.16% | 263 | 485 | 179 | 14 | 45 | 0.135 | 4.0 GB | 4.1 GB |
 
-RTF is wall time ÷ audio duration, including model loading. 0.067 is about 4 minutes per audio hour.
+RTF is wall time ÷ audio duration, including model loading. 0.067 is about 4 minutes per audio hour. This table is the first round, before the batched Parakeet decoder and the cache cap.
 
 \* "Duplicated" counts inserted words that repeat the preceding words. For Qwen3 these are real stutters the reference omits ("of of", "that that that that"), not chunk-boundary duplicates; none cluster at chunk cuts. Whisper's 45 include genuine repetition-loop output.
 
@@ -33,14 +35,9 @@ Per talk, 8-bit Qwen3 beat Parakeet on 7 talks and was narrowly worse on 3. The 
 
 8-bit vs bf16 Qwen3: per-talk differences range from −0.10 to +0.12 points, in both directions. **No measurable accuracy loss.**
 
-### Two-engine presets (actual runs, 2 talks, 5,613 words)
+### Two-engine presets
 
-| preset | WER | RTF | peak MLX |
-|---|---|---|---|
-| `accurate` (Qwen3 8-bit + Parakeet) | 2.67% | 0.072 | 6.2 GB |
-| `accurate-full` (Qwen3 bf16 + Parakeet) | 2.62% | 0.091 | 8.2 GB |
-
-Engines run sequentially and are unloaded in between, so peak memory is that of the larger engine. In the bf16 run, Parakeet accounted for 13.3 s of 131 s (10%).
+First round (2 talks, 5,613 words): `accurate` 2.67% WER, RTF 0.072; `accurate-full` 2.62%, RTF 0.091. Current figures are in "Speed and memory summary". Engines run sequentially and are unloaded in between, so peak memory is that of the larger engine. In the bf16 run, Parakeet accounted for 13.3 s of 131 s (10%).
 
 ## Review flags: do they find the errors?
 
@@ -105,22 +102,27 @@ The differences are 0–2 words out of 278, so **no measurable effect** at this 
 
 ## Speed and memory summary
 
-| | default `fast` | `accurate` |
-|---|---|---|
-| processing per audio hour | ~20 s (3 h lecture ≈ 1 min) | ~4.3 min (3 h ≈ 13 min)† |
-| peak unified (GPU) memory | 2.4 GB | 6.2 GB |
-| model disk | 2.5 GB | 6.8 GB |
+Re-measured 2026-11-19 after the batched decoder and the cache cap. `fast` and `accurate` cover all 10 TED talks; `accurate-full` was run on one talk (BillGates, 25 min).
 
-† `accurate` was measured before the batched Parakeet decoder. Its Parakeet share is now smaller, so ~4.3 min is an upper bound.
+| | `fast` (default) | `accurate` | `accurate-full` |
+|---|---|---|---|
+| TED WER | 3.07% | 2.21% | (2.20% in round 1) |
+| processing per audio hour (RTF) | ~16 s (0.0045) | ~3.2 min (0.054) | ~4.7 min (0.079) |
+| 3 h lecture | under 1 min | ~10 min | ~14 min |
+| **peak RAM (footprint)** | **3.0–3.2 GB** | **6.4–6.7 GB** | 8.3 GB |
+| live MLX allocations | 2.3 GB | 6.2 GB | 8.2 GB |
+| model disk | 2.5 GB | 6.8 GB | 9.0 GB |
+
+What fixed the gap between live allocations and real RAM: constant-length Parakeet windows, and a 1 GB MLX cache cap for all engines. On BillGates (25 min) the Parakeet-only footprint was 18.3 GB with per-chunk decoding and variable windows, and is 3.3 GB now. Qwen3 8-bit alone went from 8.5 to 6.7 GB with the cap, with a byte-identical transcript.
 
 Audio is memory-mapped in both: 3 h of audio is 0.7 GB.
 
 ### Batched decoding (`fast`, after the concurrency change)
 
-| | WER (10 TED talks) | sub / del / ins | RTF | peak MLX |
+| | WER (10 TED talks) | sub / del / ins | RTF | peak RAM (BillGates) |
 |---|---|---|---|---|
-| per-chunk decoding (before) | 3.04% | 261 / 450 / 96 | 0.017 | 2.4 GB |
-| constant windows + batched TDT decoding | 3.07% | 265 / 455 / 94 | **0.005** | 2.3 GB |
+| per-chunk decoding, variable windows (before) | 3.04% | 261 / 450 / 96 | 0.017 | 18.3 GB |
+| constant windows + batched TDT decoding + cache cap | 3.07% | 265 / 455 / 94 | **0.0045** | 3.3 GB |
 
 The 0.03-point difference is 7 words out of 26,513, with per-talk changes in both directions (bf16 rounding on near-tie tokens). Design and the alternatives that were measured and rejected: ARCHITECTURE.md, "Concurrency".
 

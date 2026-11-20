@@ -18,7 +18,8 @@ Metrics (all on Whisper-normalised text):
   hallucination      words whose midpoint lies in a known no-speech region
   timestamps         |start of first word - true onset| per known onset
   term recall        occurrences of vocabulary terms recognised (bag-of-ngrams)
-  RTF, peak RSS, peak MLX (unified GPU) memory
+  RTF; peak memory footprint (what macOS charges the process, incl. MLX's
+  buffer cache), plus peak RSS and peak live MLX allocations for diagnosis
 """
 
 from __future__ import annotations
@@ -142,7 +143,9 @@ def evaluate_output(item: dict, transcript_json: Path, metrics: dict, with_vocab
     row = {"id": item["id"], "preset": doc["preset"], "vocab": with_vocab, **s.to_dict(),
            "audio_s": metrics.get("duration_s"), "rtf": metrics.get("realtime_factor"),
            "wall_s": metrics.get("timings", {}).get("total_s"),
-           "peak_rss_gb": metrics.get("peak_rss_gb"), "peak_mlx_gb": metrics.get("peak_mlx_gb"),
+           "peak_footprint_gb": metrics.get("peak_footprint_gb"), "peak_rss_gb": metrics.get("peak_rss_gb"),
+           # "peak_mlx_gb" is the key used before footprint was recorded
+           "peak_mlx_active_gb": metrics.get("peak_mlx_active_gb", metrics.get("peak_mlx_gb")),
            "uncertain_spans": len(doc["uncertain"]),
            "flagged_words": sum(1 for w in doc["words"] if w.get("flags"))}
     if item.get("vocab"):
@@ -204,8 +207,13 @@ def write_report(results_path: Path, md_path: Path) -> None:
     lines = ["# Benchmark report", "",
              "Pooled WER = total errors / total reference words across items (not a mean of per-file WERs).", "",
              "## Per preset (pooled)", "",
-             "| preset | vocab | items | ref words | WER | CER | sub | del | ins | missing | duplicated | mean RTF | max peak RSS GB | max peak MLX GB |",
+             "| preset | vocab | items | ref words | WER | CER | sub | del | ins | missing | duplicated | mean RTF | max peak footprint GB | max live MLX GB |",
              "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+
+    def _mx(rs, k):
+        vals = [r.get(k) for r in rs if r.get(k) is not None]
+        return f"{max(vals):.1f}" if vals else "n/a"
+
     groups: dict[tuple, list] = {}
     for r in rows:
         groups.setdefault((r["preset"], r["vocab"]), []).append(r)
@@ -216,8 +224,8 @@ def write_report(results_path: Path, md_path: Path) -> None:
         lines.append(f"| {p} | {'on' if v else 'off'} | {len(rs)} | {n} | {err / n:.2%} | {cer_w:.2%} | "
                      f"{sum(r['sub'] for r in rs)} | {sum(r['dele'] for r in rs)} | {sum(r['ins'] for r in rs)} | "
                      f"{sum(r['missing_words'] for r in rs)} | {sum(r['duplicated_words'] for r in rs)} | "
-                     f"{statistics.mean(r['rtf'] or 0 for r in rs):.3f} | {max(r['peak_rss_gb'] or 0 for r in rs):.1f} | "
-                     f"{max(r['peak_mlx_gb'] or 0 for r in rs):.1f} |")
+                     f"{statistics.mean(r['rtf'] or 0 for r in rs):.3f} | {_mx(rs, 'peak_footprint_gb')} | "
+                     f"{_mx(rs, 'peak_mlx_active_gb')} |")
     lines += ["", "## Per item", "", "| item | preset | vocab | WER | CER | missing | dup | uncertain spans | extra |",
               "|---|---|---|---|---|---|---|---|---|"]
     for r in sorted(rows, key=lambda r: (r["id"], r["preset"], r["vocab"])):
