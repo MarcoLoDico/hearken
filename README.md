@@ -11,7 +11,7 @@ hearken transcribe recording.mp4
 ## Why hearken
 
 - **Fast.** ~16 s per hour of audio.
-- **Parallel decoding.** The audio is cut into 2-minute chunks at pauses, and up to 16 are decoded together on the GPU instead of one after another. Compared with stock parakeet-mlx, the Parakeet step is 7.5× faster (27.8 s → 3.7 s on a 25-minute talk). The whole run is 3.5× faster (147 s → 42 s for 2.5 h of TED talks), with the same accuracy (3.07% vs 3.04% WER).
+- **Parallel.** Audio is split at pauses into equal 2-minute chunks, and 16 are transcribed at once instead of one by one. On a 25-minute talk, compared with one-by-one stock parakeet-mlx: **7.5× faster** (27.8 s → 3.7 s) and **18.3 → 3.3 GB RAM**, same accuracy. Equal chunk sizes are what save the RAM, because MLX caches memory separately for each size it sees.
 - **Accurate.** 3.1% word error rate on TED talks by default, 2.2% with `--preset accurate`.
 - **Private.** Models are downloaded once. After that, nothing leaves your machine, and logs never contain transcript text.
 - **Faithful.** It never summarises or "fixes" what was said. Doubtful passages are marked `[? … ?]` and listed for review.
