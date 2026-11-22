@@ -1,7 +1,7 @@
 """Alibaba Qwen3-ASR via mlx-qwen3-asr (Apache-2.0 code and weights).
 
 An audio-encoder + LLM-decoder model. It accepts free-text *context*, which we
-fill with the course vocabulary (and optionally the preceding transcript),
+fill with the user's vocabulary (and optionally the preceding transcript),
 and it is paired with Qwen3-ForcedAligner for word timestamps. It produces no
 per-word confidence.
 """

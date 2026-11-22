@@ -14,7 +14,7 @@ from ..types import Word
 class ChunkContext:
     """Text context an engine may use to bias recognition.
 
-    ``vocabulary``: course terms supplied by the user.
+    ``vocabulary``: domain terms supplied by the user (names, jargon).
     ``previous_text``: the end of the already-transcribed preceding chunk
     (only used by engines whose ``uses_previous_text`` option is on).
     """

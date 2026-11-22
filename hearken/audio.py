@@ -7,7 +7,7 @@ WAV, FLAC, OGG/Opus, WebM, ...
 All engines consume 16 kHz mono float32, which is what every model evaluated
 here was trained on. We decode straight from the source to that format in a
 single high-quality resampling step (libswresample), and stream the samples to
-a private temporary file that is memory-mapped, so a 3-hour lecture costs
+a private temporary file that is memory-mapped, so a 3-hour recording costs
 ~0.7 GB of address space rather than several in-memory copies.
 
 Preprocessing policy (see docs/ARCHITECTURE.md for the reasoning):

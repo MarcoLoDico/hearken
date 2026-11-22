@@ -5,7 +5,7 @@ prepare-tedlium   TED-LIUM 3 long-form test set (11 complete talks, ~2.5 h,
 stress            derive stress variants from an item: inserted non-speech
                   gaps (silence and room-tone noise) at known positions,
                   additive noise at a fixed SNR, and a very quiet copy.
-terms             synthetic technical-vocabulary lecture built with macOS
+terms             synthetic technical-vocabulary talk built with macOS
                   `say`, with exact sentence onsets for timestamp scoring.
 """
 
@@ -187,7 +187,7 @@ def cmd_terms(a: argparse.Namespace) -> int:
     item = {"id": "terms", "audio": "terms.wav", "reference": "terms.txt", "vocab": "terms_vocab.txt",
             "onsets": onsets}
     (out / "manifest.jsonl").write_text(json.dumps(item) + "\n")
-    print(f"synthetic lecture {t:.0f}s -> {out / 'manifest.jsonl'}")
+    print(f"synthetic talk {t:.0f}s -> {out / 'manifest.jsonl'}")
     return 0
 
 

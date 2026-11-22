@@ -25,7 +25,7 @@ source file ──► decode (PyAV, 16 kHz mono f32, memory-mapped temp file)
 
 ### Decoding
 
-PyAV ships its own FFmpeg libraries, so any container FFmpeg reads works (MP4, MOV, MKV, MP3, M4A/AAC, WAV, FLAC, OGG/Opus, WebM) without a system `ffmpeg`. Audio is resampled once, straight from the source rate to 16 kHz, with libswresample. Channels are averaged in NumPy. FFmpeg's default stereo→mono matrix adds +3 dB to centred speech and can clip loud recordings, so it is not used. Samples are streamed to a private (`0600`) temporary file and memory-mapped, so a 3-hour lecture uses ~0.7 GB of address space and is never held in several in-RAM copies.
+PyAV ships its own FFmpeg libraries, so any container FFmpeg reads works (MP4, MOV, MKV, MP3, M4A/AAC, WAV, FLAC, OGG/Opus, WebM) without a system `ffmpeg`. Audio is resampled once, straight from the source rate to 16 kHz, with libswresample. Channels are averaged in NumPy. FFmpeg's default stereo→mono matrix adds +3 dB to centred speech and can clip loud recordings, so it is not used. Samples are streamed to a private (`0600`) temporary file and memory-mapped, so a 3-hour recording uses ~0.7 GB of address space and is never held in several in-RAM copies.
 
 ### Preprocessing — deliberately minimal
 
@@ -33,7 +33,7 @@ Only invertible, spectrally neutral operations are applied: DC-offset removal, a
 
 ### VAD is evidence, not a gate
 
-Many pipelines (WhisperX, faster-whisper's `vad_filter`) delete non-speech before recognition. That is fast, but a VAD miss deletes quiet speech irrecoverably: a student question from the back of the room, a mumbled aside. hearken never removes audio. The VAD is used to:
+Many pipelines (WhisperX, faster-whisper's `vad_filter`) delete non-speech before recognition. That is fast, but a VAD miss deletes quiet speech irrecoverably: a quiet question from the back of the room, a mumbled aside. hearken never removes audio. The VAD is used to:
 
 - place chunk cuts in pauses,
 - flag recognised words that lie in apparent silence (`no_speech_detected`, possible hallucination),

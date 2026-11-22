@@ -108,7 +108,7 @@ Re-measured 2026-11-19 after the batched decoder and the cache cap. `fast` and `
 |---|---|---|---|
 | TED WER | 3.07% | 2.21% | (2.20% in round 1) |
 | processing per audio hour (RTF) | ~16 s (0.0045) | ~3.2 min (0.054) | ~4.7 min (0.079) |
-| 3 h lecture | under 1 min | ~10 min | ~14 min |
+| 3 h recording | under 1 min | ~10 min | ~14 min |
 | **peak RAM (footprint)** | **3.0–3.2 GB** | **6.4–6.7 GB** | 8.3 GB |
 | live MLX allocations | 2.3 GB | 6.2 GB | 8.2 GB |
 | model disk | 2.5 GB | 6.8 GB | 9.0 GB |
@@ -142,6 +142,6 @@ The 0.03-point difference is 7 words out of 26,513, with per-talk changes in bot
 
 1. **A larger primary when memory allows.** Nemotron 3.5 Transcribe or the next Qwen3-ASR would likely help, but need ≥ 48 GB unified memory today.
 2. **Second-pass decoding of flagged spans:** re-decode only disagreement regions with a wider context window and beam search, then show the result as a third reading. It is cheap because it covers under 2% of the audio.
-3. **Lecture-domain evaluation:** record and hand-correct 2–3 real lectures (accents, board noise, student questions). TED is cleaner than a classroom.
-4. **Slide or syllabus vocabulary extraction:** build `--vocab` automatically from course PDFs, then measure it on real lectures.
+3. **Real-world evaluation:** hand-correct a few real recordings of different kinds (meetings, interviews, classrooms, phone calls). TED is cleaner than all of them.
+4. **Automatic vocabulary:** build `--vocab` from related documents (slides, agendas, papers), then measure whether it helps.
 5. **Speaker diarisation** for Q&A segments, as a separate, optional pass.

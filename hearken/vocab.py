@@ -1,4 +1,4 @@
-"""Course vocabulary files.
+"""Vocabulary files (names, jargon, domain terms).
 
 Plain UTF-8 text, one term per line. Blank lines and lines starting with '#'
 are ignored. Terms are passed verbatim to the engines (spelling and casing

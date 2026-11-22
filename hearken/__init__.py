@@ -1,3 +1,3 @@
-"""hearken: accuracy-first, fully local transcription for long lectures."""
+"""hearken: fast, faithful, fully local speech-to-text for long recordings."""
 
 __version__ = "0.1.0"

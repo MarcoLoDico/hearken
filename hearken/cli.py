@@ -167,7 +167,7 @@ def _add_format_args(p: argparse.ArgumentParser) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    ap = argparse.ArgumentParser(prog="hearken", description="Accuracy-first local transcription for long lectures.")
+    ap = argparse.ArgumentParser(prog="hearken", description="Fast, faithful, fully local speech-to-text.")
     ap.add_argument("--version", action="version", version=f"hearken {__version__}")
     ap.add_argument("-v", "--verbose", action="store_true", help="debug logging (never logs transcript text)")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -185,7 +185,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("inputs", nargs="+")
     p.add_argument("-o", "--output", help="output directory (default: <input>.transcript/ next to the input)")
     p.add_argument("-p", "--preset", default=presets.DEFAULT_PRESET, choices=list(presets.PRESETS))
-    p.add_argument("--vocab", help="course terminology file, one term per line")
+    p.add_argument("--vocab", help="vocabulary file (names, jargon), one term per line")
     p.add_argument("--language", default="en", help="spoken language code (default en)")
     p.add_argument("--no-preprocess", action="store_true", help="skip DC/gain correction")
     p.add_argument("--metrics-json", help="write timing/memory metrics to this file")

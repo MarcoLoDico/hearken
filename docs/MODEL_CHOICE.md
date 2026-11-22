@@ -1,6 +1,6 @@
 # Model choice
 
-**Default preset `fast`: Parakeet TDT 0.6B v2 alone.** It is ~12× faster and needs half the memory of the most accurate configuration (about 16 s per audio hour, 3.2 GB peak RAM), for a modest accuracy cost (3.1% vs 2.2% WER on TED lectures). Most of that cost is dropped repetitions and fillers, not misheard content words. That trade was chosen deliberately, as the better fit for everyday lecture notes.
+**Default preset `fast`: Parakeet TDT 0.6B v2 alone.** It is ~12× faster and needs half the memory of the most accurate configuration (about 16 s per audio hour, 3.2 GB peak RAM), for a modest accuracy cost (3.1% vs 2.2% WER on TED talks). Most of that cost is dropped repetitions and fillers, not misheard content words. That trade was chosen deliberately, as the better fit for everyday transcription.
 
 **Most accurate preset `accurate`:** Qwen3-ASR 1.7B with 8-bit weights writes the transcript. NVIDIA Parakeet TDT 0.6B v2 independently re-transcribes the audio, and every place it disagrees is flagged for review. Parakeet never changes the text.
 
@@ -44,6 +44,7 @@ It is exactly as accurate as full precision (2.21% vs 2.20%, with per-talk diffe
 
 ## Caveats
 
-- English only. TED talks are lecture-like but more polished than a classroom.
+- English only. TED talks are cleaner than most real recordings (meetings, classrooms, phone calls).
+- One speaker at a time. Every benchmark is a single-speaker talk, there is no speaker labelling, and overlapping speech is untested.
 - Under heavy noise (5 dB SNR), Parakeet did slightly better than Qwen3 (2.86% vs 3.25%) on the one talk tested.
-- The terminology test is synthetic (text-to-speech). Course vocabulary showed no measurable effect there, so test it on your own lectures.
+- The terminology test is synthetic (text-to-speech). Vocabulary showed no measurable effect there, so test it on your own recordings.
