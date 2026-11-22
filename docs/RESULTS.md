@@ -126,6 +126,28 @@ Audio is memory-mapped in both: 3 h of audio is 0.7 GB.
 
 The 0.03-point difference is 7 words out of 26,513, with per-talk changes in both directions (bf16 rounding on near-tie tokens). Design and the alternatives that were measured and rejected: ARCHITECTURE.md, "Concurrency".
 
+### Compared with stock parakeet-mlx
+
+Same model (Parakeet TDT v2, bf16 weights), same 25-minute talk (BillGates), measured 2026-11-22. Stock parakeet-mlx 0.7.0 was run through its Python API, `model.transcribe(chunk_duration=120, overlap_duration=15)`, which is the CLI's default path. Audio was handed to it exactly as its own `load_audio` produces it: float32 PCM, because the CLI needs a system FFmpeg. Peak RAM is the macOS process footprint. "Live MLX" is `mx.get_peak_memory()`.
+
+| run | transcription | peak RAM | live MLX peak |
+|---|---|---|---|
+| stock | 14.1 s | 5.74 GB | — |
+| stock + 1 GB cache cap | 14.1 s | 4.33 GB | 3.30 GB |
+| stock + cap + log-mel cast to bf16 | 10.5 s | 3.25 GB | 2.36 GB |
+| hearken, same windows, one chunk at a time | 10.5 s | 3.09 GB | 2.28 GB |
+| hearken, 16 chunks at once (`fast`) | **3.5 s** | **3.09 GB** | 2.36 GB |
+| stock with `--fp32` (full-precision weights) | 13.7 s | 7.18 GB | — |
+
+The 2.6 GB that hearken saves has two causes. **Neither is parallel decoding.**
+
+1. **The MLX cache cap saves 1.4 GB.** Stock parakeet-mlx leaves MLX's buffer cache unlimited, so freed buffers are kept for reuse. hearken caps the cache at 1 GB.
+2. **Running the encoder in bf16 saves 1.1 GB.** parakeet-mlx's `load_audio` always returns float32 and ignores its `dtype` argument, so the log-mel spectrogram is float32. When a float32 input meets bf16 weights, MLX promotes the result to float32. Every encoder activation of every 120 s window is therefore twice the size it needs to be, and the encoder is also ~35% slower. hearken casts the log-mel to bf16 before the encoder. On this talk it makes no accuracy difference: stock WER is 4.18% with the float32 mel and 4.16% with the bf16 mel.
+
+**Decoding 16 chunks together adds no measurable memory** (3.09 GB either way). The model weights are loaded once and shared, and the encoder still runs one window at a time. Only the decoder is batched, and it holds just each window's encoder output (~3 MB) and a small LSTM state, about 50 MB for 16 windows. Batching is purely a speed change: 10.5 s → 3.5 s.
+
+The speedup over stock therefore breaks down as: bf16 encoder 14.1 → 10.5 s, then batched decoding 10.5 → 3.5 s. The end-to-end hearken run, including decoding the file, VAD and writing five output formats, takes 6.3 s against stock's 14.6 s.
+
 ## Known failure modes
 
 1. **Errors both models share are not flagged.** Recall is ~17%: proper nouns, homophones ("their/they're"), and words neither model knows. A clean-looking passage can still be wrong.

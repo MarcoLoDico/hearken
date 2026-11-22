@@ -57,6 +57,9 @@ What hearken does instead:
 
 1. **Constant-shape windows.** Every Parakeet window is exactly 120 s of real audio. A shorter core simply gets more context on each side. MLX keeps a buffer set per tensor shape. With variable windows, encoding a 25-minute talk took 16 s and grew the cache to 16.8 GB; with constant windows it takes 6 s and the cache stays at 1.6 GB. The process's real peak footprint on that talk went from 18.3 GB to 3.3 GB. The MLX cache is also capped at 1 GB for every engine: for Qwen3 that alone cut the footprint from 8.5 to 6.7 GB, with an identical transcript and no speed cost.
 2. **Lockstep batched TDT decoding** (`engines/tdt_batch.py`). Up to 16 chunks decode together. The joint network's encoder projection is computed once for all frames, each step is one batched joint evaluation with a single sync, and the LSTM runs only for chunks that emitted a token. It applies the same decoding rule as parakeet-mlx. It also avoids parakeet-mlx's LSTM wrapper, which mixes up time and batch axes and is only correct at batch size 1.
+3. **bf16 encoder input.** parakeet-mlx always produces a float32 log-mel, which makes MLX run the bf16 encoder with float32 activations. hearken casts the log-mel to bf16 first. That saves 1.1 GB and makes the encoder ~35% faster, with no measurable accuracy change.
+
+Batching itself adds no memory: weights are shared, encoding stays one window at a time, and the decoder holds only ~3 MB per window. RESULTS.md, "Compared with stock parakeet-mlx", breaks down every gigabyte and second against the stock library.
 
 Result on a 25-minute talk: the Parakeet stage drops from 27.8 s to 3.7 s and the whole run from 33.5 s to 5.7 s. On all 10 TED talks, WER is 3.07% vs 3.04% (7 words out of 26,513; bf16 rounding on near-ties, differences in both directions). Beam search and vocabulary boosting still use the per-chunk library path.
 
